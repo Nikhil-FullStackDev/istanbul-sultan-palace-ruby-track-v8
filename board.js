@@ -2493,8 +2493,10 @@ function mpApplySnapshot(s){
   if(panel && s.panelHTML!=null) panel.innerHTML=s.panelHTML;
 
   const my=MP.myColor;
-  const mine=players.find(p=>p.color===my)||activePlayer()||players[0];
-  if(mine){ boardsEl.innerHTML=playerBoardCardHTML(mine); bindPlayerBoardsInteractions(); }
+  const mineHtml=(s.wheelbarrows && s.wheelbarrows[my])
+    || (()=>{ const p=players.find(x=>x.color===my)||activePlayer()||players[0]; return p?playerBoardCardHTML(p):''; })();
+  boardsEl.innerHTML=mineHtml;
+  bindPlayerBoardsInteractions();
 
   document.getElementById('choice-modal-backdrop')?.remove();
   if(s.modalHTML) document.body.insertAdjacentHTML('beforeend', s.modalHTML);

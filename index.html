@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Istanbul — Board Layout</title><link rel="stylesheet" href="board.css?v=20260911d"><style>.tile{position:relative}.tile-slot{top:0!important;left:0!important;width:100%!important;height:100%!important}.deck{will-change:transform}</style></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Istanbul — Board Layout</title><link rel="stylesheet" href="board.css?v=20260911f"><style>.tile{position:relative}.tile-slot{top:0!important;left:0!important;width:100%!important;height:100%!important}.deck{will-change:transform}</style></head>
 <body class="fit"><main>
   <header>
     <p class="eyebrow">Board assembly · base game · build 20260909u</p>
@@ -9,6 +9,7 @@
 </header>
   <section id="play-surface" class="play-surface hide-editing-controls" aria-label="Istanbul board and movable components">
     <section class="table" aria-label="Istanbul board layout"><div class="board-frame"><div id="board" class="board"></div></div></section>
+    <aside id="side-rail" class="side-rail">
     <section id="game-panel" class="game-panel" aria-label="Player turn and status">
       <div class="setup-row">
         <span class="setup-label">New game with</span>
@@ -29,30 +30,12 @@
       <div id="dice-tray" class="dice-tray"></div>
       <ol id="game-log" class="game-log" aria-label="Recent actions"></ol>
     </section>
+    <div id="player-boards" class="player-boards" aria-label="Your wheelbarrow"></div>
+    </aside>
     <section class="deck-area" aria-label="Card supply and placement tray"><div class="deck-note"><strong>Card placement tray</strong><span>Unlock, then drag an entire stack onto the board. Once it lands on a tile it locks there permanently.</span></div><div class="card-supply"><div class="card-supply-slot"><strong>Bonus deck</strong><img src="assets/cards-review/cards/icon-bonus-cards/icon-bonus-card-01.png" alt="Bonus card deck"><span>Draw through a tile action</span></div><div class="card-supply-slot"><strong>Bonus discard</strong><div id="global-bonus-discard" class="global-discard-slot"><span>Discard pile · 0</span></div></div><div class="card-supply-slot"><strong>Other card supply</strong><span>Market demand / Mosque tiles are handled by their tile actions.</span></div></div></section>
     <div id="decks" class="decks" data-locked="true"></div>
   </section>
 </main>
 <div id="turn-toast" class="turn-toast" role="status" aria-live="polite" hidden></div>
-<button id="wb-open-btn" class="wb-open-btn" type="button" aria-haspopup="dialog" aria-controls="wb-modal">🛒 Wheelbarrows</button>
-<div id="wb-modal" class="wb-modal hide-editing-controls" role="dialog" aria-modal="true" aria-label="Player wheelbarrows" hidden>
-  <div class="wb-modal-backdrop" data-wb-close></div>
-  <div class="wb-modal-panel">
-    <button class="wb-modal-close" type="button" data-wb-close aria-label="Close wheelbarrows">×</button>
-    <h2>Wheelbarrows</h2>
-    <div id="player-boards" class="player-boards" aria-label="Player boards"></div>
-  </div>
-</div>
-<script src="net.js?v=20260911d"></script><script src="board.seed.js?v=20260910c"></script><script src="board.js?v=20260911d"></script>
-<script>
-(function(){
-  var modal=document.getElementById('wb-modal'),openBtn=document.getElementById('wb-open-btn');
-  if(!modal||!openBtn)return;
-  function open(){modal.hidden=false;document.body.classList.add('wb-open');requestAnimationFrame(function(){try{placeAttachments();placePlayers();}catch(e){}});}
-  function close(){modal.hidden=true;document.body.classList.remove('wb-open');}
-  openBtn.addEventListener('click',open);
-  modal.addEventListener('click',function(e){if(e.target.hasAttribute('data-wb-close'))close();});
-  document.addEventListener('keydown',function(e){if(e.key==='Escape'&&!modal.hidden)close();});
-})();
-</script>
+<script src="net.js?v=20260911f"></script><script src="board.seed.js?v=20260910c"></script><script src="board.js?v=20260911f"></script>
 </body></html>

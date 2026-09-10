@@ -285,6 +285,8 @@
 .hide-editing-controls .layer-index{display:none!important}
 /* Gemstone ruby track: keep the rubies, drop the boxes/outlines. */
 .hide-editing-controls .gemstone-board-layer{border-color:transparent!important;background:transparent!important;box-shadow:none!important;cursor:default!important;pointer-events:none!important}
+/* The dashed per-tile placement slot is editing scaffolding — hide its box entirely. */
+.hide-editing-controls .tile-slot{border-color:transparent!important;background:transparent!important;box-shadow:none!important;resize:none!important}
 
 /* --- On-board dice roll animation --- */
 #board-dice-overlay{
@@ -492,9 +494,9 @@
 .sultan-palace-requirement-ruby img{display:block;width:100%;height:100%;object-fit:contain;pointer-events:none}
 
 /* ============================================================
-   Fit-to-screen test layout  (body.fit)
-   Board scales to the viewport, no page scroll; the player
-   wheelbarrows live in a right-side fly-in modal.
+   Fit-to-screen layout  (body.fit)
+   Board pinned to the left, fills the viewport height; the
+   player's own wheelbarrow sits in the right rail. No scroll.
    ============================================================ */
 html,body{height:100%}
 body.fit{overflow:hidden}
@@ -505,49 +507,44 @@ body.fit header{margin:0;max-width:none;flex:none;display:flex;align-items:basel
 body.fit header .eyebrow,body.fit header .intro{display:none}
 body.fit header h1{font-size:clamp(1rem,2.1vw,1.5rem);line-height:1;letter-spacing:-.02em}
 
-body.fit #play-surface{flex:1;min-height:0;display:flex;gap:8px;align-items:stretch;overflow:hidden}
+body.fit #play-surface{flex:1;min-height:0;display:flex;gap:10px;align-items:stretch;overflow:hidden}
 
-/* ---- board column ---- */
-body.fit .table{height:100%;width:auto;max-width:100%;aspect-ratio:1.185;margin:0 auto;
-  flex:0 1 auto;display:flex;padding:clamp(6px,1vw,14px);border-radius:16px;
+/* ---- board, left ---- */
+body.fit .table{height:100%;width:auto;max-width:100%;aspect-ratio:1.185;margin:0;
+  flex:0 0 auto;display:flex;padding:clamp(6px,1vw,14px);border-radius:16px;
   box-shadow:inset 0 0 0 7px rgba(49,24,12,.5),inset 0 0 40px rgba(23,9,4,.72)}
 body.fit .board-frame{flex:1;min-width:0;min-height:0;display:flex;padding:clamp(4px,.9vw,11px)}
 body.fit .board{flex:1;min-width:0;min-height:0;gap:clamp(3px,.7vw,9px);
   grid-template-rows:repeat(4,1fr)}
 body.fit .tile{aspect-ratio:auto;width:100%;height:100%;min-height:0}
 
-/* ---- side panel ---- */
-body.fit #game-panel{flex:none;width:clamp(220px,24vw,300px);height:100%;margin:0;
-  padding:10px 12px;border-radius:14px;display:flex;flex-direction:column;gap:8px;overflow:hidden}
+/* ---- right rail: turn panel + your wheelbarrow ---- */
+body.fit #side-rail{flex:1 1 auto;min-width:0;margin-left:auto;height:100%;
+  display:flex;flex-direction:column;gap:8px;max-width:min(52vw,680px)}
+body.fit #game-panel{flex:0 0 auto;max-height:min(48%,340px);margin:0;
+  padding:10px 12px;border-radius:14px;display:flex;flex-direction:column;gap:8px;overflow-y:auto}
 body.fit .setup-row{padding-bottom:6px;gap:6px}
 body.fit .setup-hint{display:none}
 body.fit .turn-row{gap:6px}
 body.fit .turn-status{font-size:.95rem}
 body.fit .turn-hint{font-size:.74rem}
 body.fit #game-log{flex:1;min-height:40px;overflow-y:auto;margin:0}
+body.fit #player-boards{flex:1 1 auto;min-height:0;overflow:auto;
+  padding:8px 10px;border:1px solid #966633;border-radius:14px;background:rgba(26,17,12,.76);
+  display:flex;justify-content:center}
+body.fit #player-boards .player-board-card{width:100%;max-width:520px}
+/* Compact vertical wheelbarrow so it fits the rail without sideways scrolling. */
+body.fit #player-boards .player-board-stage{display:flex;flex-direction:column;align-items:stretch;
+  width:100%;max-width:100%;gap:8px}
+body.fit #player-boards .player-board-stage>*{width:100%;min-width:0}
+body.fit #player-boards .sultan-row-arrow-spacer{display:none}
+body.fit #player-boards .player-coin-rack{flex-direction:row;justify-content:center;flex-wrap:wrap;gap:8px}
+body.fit #player-boards .player-card-sidebar{flex-direction:row;justify-content:space-around;gap:10px}
+body.fit #player-boards .stat-row{flex-wrap:wrap;justify-content:center}
 body.fit .deck-area{display:none!important}
 
-/* ---- wheelbarrow open button ---- */
-.wb-open-btn{position:fixed;right:14px;bottom:14px;z-index:60;padding:10px 16px;
-  border-radius:999px;font:800 .82rem system-ui,sans-serif;cursor:pointer;
-  box-shadow:0 6px 16px rgba(0,0,0,.5)}
-body:not(.fit) .wb-open-btn{display:none}
-
-/* ---- wheelbarrow fly-in modal ---- */
-.wb-modal[hidden]{display:none}
-.wb-modal{position:fixed;inset:0;z-index:70;display:flex}
-.wb-modal-backdrop{position:absolute;inset:0;background:rgba(6,10,10,.6);
-  opacity:0;transition:opacity .25s ease}
-.wb-modal:not([hidden]) .wb-modal-backdrop{opacity:1}
-.wb-modal-panel{position:relative;margin-left:auto;height:100%;width:min(940px,94vw);
-  background:linear-gradient(160deg,#241811,#160d08);border-left:1px solid #966633;
-  box-shadow:-14px 0 44px rgba(0,0,0,.55);padding:18px clamp(12px,2vw,24px) 28px;
-  overflow-y:auto;transform:translateX(100%);transition:transform .28s ease}
-.wb-modal:not([hidden]) .wb-modal-panel{transform:translateX(0)}
-.wb-modal-panel h2{margin:0 0 12px;color:#ffe9b8;font:800 1.1rem system-ui,sans-serif}
-.wb-modal-close{position:absolute;top:12px;right:14px;width:34px;height:34px;
-  border-radius:999px;font-size:1.15rem;line-height:1;padding:0;cursor:pointer}
-.wb-modal .player-boards{gap:20px}
+/* Once a multiplayer game has started, the lobby/setup controls are done with. */
+body.mp-live .setup-row{display:none!important}
 
 /* Fit-mode: scale tile-attached card stacks down with the board so they
    stay inside their tiles.  --fit-k is set on #decks by board.js. */
