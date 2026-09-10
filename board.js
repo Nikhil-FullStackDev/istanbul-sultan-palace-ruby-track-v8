@@ -1736,6 +1736,7 @@ function nextTurn(){
   turn=(turn+1)%players.length;awaitingAction=false;actionInitiated=false;pendingAssistantDrop=false;pendingDice=null;familyActionTarget=null;familyActionMode=false;pendingFamilyCatch=null;lastDiceRoll=null;
   players.forEach(p=>{p.yellowRecallUsed=false;p.greenBonusUsed=false});
   renderAll();
+  announceTurn();
   if(gameOver==='round'&&turn===0){const w=finalWinner();gameOver=true;addLog(`🏆 ${w.name} wins with ${w.rubies} Rubies.`);renderAll()}
 }
 async function onTileClick(name){
@@ -2100,7 +2101,9 @@ function renderPlayerBoards(){
   mirrorPlayerBoardLayout();
   ensureSultanCubes();
   ensureThreePlayerBoardSlotLocks();
-  boardsEl.innerHTML=players.map(p=>{
+  const ap=activePlayer();
+  const shownPlayers=ap?players.filter(p=>p.id===ap.id):players;
+  boardsEl.innerHTML=shownPlayers.map(p=>{
     const layers=playerBoardLayers[String(p.id)]||[];
     const cubeHtml=Object.values(sultanCubes).filter(c=>Number(c.playerId)===Number(p.id)).map(c=>{
       const cubeId=`${p.id}-${c.row+1}`;
@@ -2185,10 +2188,26 @@ function renderTurnStatus(){
     actionBtn.disabled=caravanBusy||!!pendingGoodChoice;
     actionBtn.textContent=caravanBusy?'Caravansary…':familyActionMode?'Resolve Family action':(p.pos==='Tea House'&&!pendingDice?'Roll Dice':`Do action at ${p.pos}`);
   }else{
-    turnHint.textContent='Choose a highlighted tile 1–2 orthogonal steps away.';
+    turnHint.textContent=`${p.name}: click a place 1–2 orthogonal steps from ${p.pos} to move.`;
     actionBtn.disabled=true;actionBtn.textContent='Move to a tile first';
   }
   endTurnBtn.disabled=!awaitingAction;
+}
+// Spoken/written turn announcement — a brief banner whenever the active merchant changes.
+function announceTurn(force){
+  const p=activePlayer();
+  const el=document.getElementById('turn-toast');
+  if(!el||!p||gameOver===true)return;
+  if(!force && announceTurn._last===p.id)return;
+  announceTurn._last=p.id;
+  el.textContent=`${p.name} — your turn to move`;
+  el.hidden=false;
+  requestAnimationFrame(()=>el.classList.add('show'));
+  clearTimeout(announceTurn._t);
+  announceTurn._t=setTimeout(()=>{
+    el.classList.remove('show');
+    setTimeout(()=>{ if(!el.classList.contains('show')) el.hidden=true; },450);
+  },2400);
 }
 function renderAll(){renderTurnStatus();renderActionUI();updateReachable();placePlayers();renderPlayerBoards();renderCardSupply();
   const p=activePlayer();
@@ -2271,7 +2290,13 @@ document.querySelector('#copy-code')?.addEventListener('click',()=>{
 });
 document.querySelector('#join-btn')?.addEventListener('click',()=>{
   const input=document.querySelector('#join-code');
-  const parsed=parseGameCode(input?.value);
+  const raw=(input?.value||'').trim();
+  if(!raw){                    // empty box: just seat another merchant at this table
+    if(players.length>=PLAYER_COLORS.length){addLog('All four merchants have already joined.');return}
+    addPlayer();
+    return;
+  }
+  const parsed=parseGameCode(raw);
   if(!parsed){addLog('That game code is not valid.');if(input)input.classList.add('invalid');return}
   input?.classList.remove('invalid');
   newGame(parsed.count,{layout:parsed.seed});
@@ -2355,12 +2380,32 @@ function newGame(count,opts={}){
   renderAll();render({randomize:doRandom,seed:gameSeed});renderDecks();setLocked(true);refreshGameCodeUI();}
 
 ensureDiceOverlay();
-{ const c=Math.min(4,Math.max(1,Number(localStorage.getItem('istanbul-game-count'))||2));
-  newGame(c,{layout:gameSeed}); }   // rebuild the last board (seed + player count) so it matches the shown code
+// Start solo: only the host merchant is on the board. Others appear one at a
+// time via "Join" (addPlayer), each new merchant token showing as it joins.
+newGame(1,{layout:gameSeed});
+
+function addPlayer(){
+  if(players.length>=PLAYER_COLORS.length)return;
+  const i=players.length,color=PLAYER_COLORS[i];
+  players.push({id:i,color,name:PLAYER_LABELS[color],pos:'Fountain',assistants:START_ASSISTANTS,left:[],
+    coins:2+i,rubies:0,bonusCards:0,bonusHand:[],mosqueCardHand:[],
+    cartUnlocked:[false,false,false],goods:{fabric:0,spice:0,fruit:0,heirloom:0},
+    familyPos:'Police Station',mosqueTiles:[],
+    yellowRecallUsed:false,greenBonusUsed:false,redMosqueUsed:false,wainwrightRubyTaken:false});
+  localStorage.setItem('istanbul-game-count',String(players.length));
+  winnerTarget=players.length===2?6:5;
+  try{ ensureSultanCubes(); ensureThreePlayerBoardSlotLocks(); mirrorPlayerBoardLayout(); }catch(_){}
+  addLog(`${PLAYER_LABELS[color]} joins — ${players.length} merchant${players.length===1?'':'s'} at the table.`);
+  persistPlayerState();
+  markPlayerCountButtons();
+  renderAll();
+  announceTurn(true);
+}
 refreshGameCodeUI();
 renderSultanPalaceCubes();
 renderDecks();
 setLocked(true);
+announceTurn(true);
 
 // Fit-to-screen layout: scale tile-attached card stacks with the board, and
 // keep every attached component aligned when the viewport is resized.

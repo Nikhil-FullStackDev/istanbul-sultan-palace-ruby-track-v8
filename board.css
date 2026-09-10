@@ -555,3 +555,17 @@ body.fit #decks .deck{width:calc(var(--card-w) * var(--scale) * var(--fit-k,1))}
 body.fit #decks .stack{width:calc(var(--card-w) * var(--scale) * var(--fit-k,1));
   height:calc((var(--card-h) * var(--scale) + 8px) * var(--fit-k,1))}
 body.fit #decks .stack img{transform:scale(calc(var(--scale) * var(--fit-k,1)))}
+
+/* No highlight ring on every reachable tile — the turn hint already states the move rule. */
+.tile.reachable::after{display:none!important}
+.tile.reachable{cursor:pointer}
+
+/* Whose-turn announcement banner */
+.turn-toast{position:fixed;left:50%;top:14px;z-index:80;
+  padding:10px 22px;border-radius:999px;
+  background:linear-gradient(180deg,#3a2412,#241206);color:#ffe9b8;
+  border:1px solid #f0c469;box-shadow:0 8px 22px rgba(0,0,0,.5);
+  font:800 .95rem/1 system-ui,sans-serif;letter-spacing:.01em;
+  opacity:0;transform:translate(-50%,-14px);pointer-events:none;
+  transition:opacity .3s ease,transform .3s ease}
+.turn-toast.show{opacity:1;transform:translate(-50%,0)}

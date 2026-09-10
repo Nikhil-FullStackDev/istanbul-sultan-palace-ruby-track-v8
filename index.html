@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Istanbul — Board Layout</title><link rel="stylesheet" href="board.css?v=20260910f"><style>.tile{position:relative}.tile-slot{top:0!important;left:0!important;width:100%!important;height:100%!important}.deck{will-change:transform}</style></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Istanbul — Board Layout</title><link rel="stylesheet" href="board.css?v=20260910g"><style>.tile{position:relative}.tile-slot{top:0!important;left:0!important;width:100%!important;height:100%!important}.deck{will-change:transform}</style></head>
 <body class="fit"><main>
   <header>
     <p class="eyebrow">Board assembly · base game · build 20260909u</p>
@@ -33,6 +33,7 @@
     <div id="decks" class="decks" data-locked="true"></div>
   </section>
 </main>
+<div id="turn-toast" class="turn-toast" role="status" aria-live="polite" hidden></div>
 <button id="wb-open-btn" class="wb-open-btn" type="button" aria-haspopup="dialog" aria-controls="wb-modal">🛒 Wheelbarrows</button>
 <div id="wb-modal" class="wb-modal hide-editing-controls" role="dialog" aria-modal="true" aria-label="Player wheelbarrows" hidden>
   <div class="wb-modal-backdrop" data-wb-close></div>
@@ -42,7 +43,7 @@
     <div id="player-boards" class="player-boards" aria-label="Player boards"></div>
   </div>
 </div>
-<script src="board.seed.js?v=20260910c"></script><script src="board.js?v=20260910f"></script>
+<script src="board.seed.js?v=20260910c"></script><script src="board.js?v=20260910g"></script>
 <script>
 (function(){
   var modal=document.getElementById('wb-modal'),openBtn=document.getElementById('wb-open-btn');
