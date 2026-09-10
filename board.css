@@ -268,23 +268,23 @@
    family members, assistants, posted-mail cubes, palace requirement markers,
    the Gemstone Dealer ruby track, and the wheelbarrow (player-board) slot
    locks -- just their outlines/numbers/handles are stripped. */
-.play-surface.hide-editing-controls .palace-layer-host,
-.play-surface.hide-editing-controls .post-office-layer-host,
-.play-surface.hide-editing-controls .post-office-add-layer,
-.play-surface.hide-editing-controls .player-board-layers-layer,
-.play-surface.hide-editing-controls .palace-layer-controls,
-.play-surface.hide-editing-controls .post-office-layer-controls,
-.play-surface.hide-editing-controls .gemstone-layer-controls,
-.play-surface.hide-editing-controls .player-board-layer-controls,
-.play-surface.hide-editing-controls .slot-lock-controls,
-.play-surface.hide-editing-controls .slot-lock-shape-controls,
-.play-surface.hide-editing-controls .slot-lock-resize,
-.play-surface.hide-editing-controls .sultan-row-arrow,
-.play-surface.hide-editing-controls .gem-ruby-number,
-.play-surface.hide-editing-controls .layer-label,
-.play-surface.hide-editing-controls .layer-index{display:none!important}
+.hide-editing-controls .palace-layer-host,
+.hide-editing-controls .post-office-layer-host,
+.hide-editing-controls .post-office-add-layer,
+.hide-editing-controls .player-board-layers-layer,
+.hide-editing-controls .palace-layer-controls,
+.hide-editing-controls .post-office-layer-controls,
+.hide-editing-controls .gemstone-layer-controls,
+.hide-editing-controls .player-board-layer-controls,
+.hide-editing-controls .slot-lock-controls,
+.hide-editing-controls .slot-lock-shape-controls,
+.hide-editing-controls .slot-lock-resize,
+.hide-editing-controls .sultan-row-arrow,
+.hide-editing-controls .gem-ruby-number,
+.hide-editing-controls .layer-label,
+.hide-editing-controls .layer-index{display:none!important}
 /* Gemstone ruby track: keep the rubies, drop the boxes/outlines. */
-.play-surface.hide-editing-controls .gemstone-board-layer{border-color:transparent!important;background:transparent!important;box-shadow:none!important;cursor:default!important;pointer-events:none!important}
+.hide-editing-controls .gemstone-board-layer{border-color:transparent!important;background:transparent!important;box-shadow:none!important;cursor:default!important;pointer-events:none!important}
 
 /* --- On-board dice roll animation --- */
 #board-dice-overlay{
@@ -395,7 +395,7 @@
 .player-board-tools button{position:relative;z-index:5001;}
 .player-board-slot-lock .slot-lock-resize{width:28px;height:28px;margin:0;border-radius:50%;z-index:5002;}
 .player-board-slot-lock .slot-lock-controls{z-index:5003;pointer-events:auto;}
-.play-surface.hide-editing-controls .player-board-tools{display:flex!important;}
+.hide-editing-controls .player-board-tools{display:flex!important;}
 
 .sultan-row-arrow-spacer{display:block;width:0;height:0;pointer-events:none}
 .sultan-cube{width:18px;height:18px}
@@ -490,3 +490,68 @@
 .sultan-palace-requirement-cubes{position:absolute;inset:0;z-index:19;pointer-events:none}
 .sultan-palace-requirement-ruby{position:absolute;left:var(--palace-req-left);top:var(--palace-req-top);transform:translate(-50%,-50%);width:8.7%;aspect-ratio:1/1;filter:drop-shadow(0 3px 4px rgba(0,0,0,.7));display:grid;place-items:center}
 .sultan-palace-requirement-ruby img{display:block;width:100%;height:100%;object-fit:contain;pointer-events:none}
+
+/* ============================================================
+   Fit-to-screen test layout  (body.fit)
+   Board scales to the viewport, no page scroll; the player
+   wheelbarrows live in a right-side fly-in modal.
+   ============================================================ */
+html,body{height:100%}
+body.fit{overflow:hidden}
+body.fit main{max-width:none;margin:0;padding:6px 10px 8px;height:100dvh;
+  display:flex;flex-direction:column;gap:6px;overflow:hidden}
+
+body.fit header{margin:0;max-width:none;flex:none;display:flex;align-items:baseline;gap:14px}
+body.fit header .eyebrow,body.fit header .intro{display:none}
+body.fit header h1{font-size:clamp(1rem,2.1vw,1.5rem);line-height:1;letter-spacing:-.02em}
+
+body.fit #play-surface{flex:1;min-height:0;display:flex;gap:8px;align-items:stretch;overflow:hidden}
+
+/* ---- board column ---- */
+body.fit .table{height:100%;width:auto;max-width:100%;aspect-ratio:1.185;margin:0 auto;
+  flex:0 1 auto;display:flex;padding:clamp(6px,1vw,14px);border-radius:16px;
+  box-shadow:inset 0 0 0 7px rgba(49,24,12,.5),inset 0 0 40px rgba(23,9,4,.72)}
+body.fit .board-frame{flex:1;min-width:0;min-height:0;display:flex;padding:clamp(4px,.9vw,11px)}
+body.fit .board{flex:1;min-width:0;min-height:0;gap:clamp(3px,.7vw,9px);
+  grid-template-rows:repeat(4,1fr)}
+body.fit .tile{aspect-ratio:auto;width:100%;height:100%;min-height:0}
+
+/* ---- side panel ---- */
+body.fit #game-panel{flex:none;width:clamp(220px,24vw,300px);height:100%;margin:0;
+  padding:10px 12px;border-radius:14px;display:flex;flex-direction:column;gap:8px;overflow:hidden}
+body.fit .setup-row{padding-bottom:6px;gap:6px}
+body.fit .setup-hint{display:none}
+body.fit .turn-row{gap:6px}
+body.fit .turn-status{font-size:.95rem}
+body.fit .turn-hint{font-size:.74rem}
+body.fit #game-log{flex:1;min-height:40px;overflow-y:auto;margin:0}
+body.fit .deck-area{display:none!important}
+
+/* ---- wheelbarrow open button ---- */
+.wb-open-btn{position:fixed;right:14px;bottom:14px;z-index:60;padding:10px 16px;
+  border-radius:999px;font:800 .82rem system-ui,sans-serif;cursor:pointer;
+  box-shadow:0 6px 16px rgba(0,0,0,.5)}
+body:not(.fit) .wb-open-btn{display:none}
+
+/* ---- wheelbarrow fly-in modal ---- */
+.wb-modal[hidden]{display:none}
+.wb-modal{position:fixed;inset:0;z-index:70;display:flex}
+.wb-modal-backdrop{position:absolute;inset:0;background:rgba(6,10,10,.6);
+  opacity:0;transition:opacity .25s ease}
+.wb-modal:not([hidden]) .wb-modal-backdrop{opacity:1}
+.wb-modal-panel{position:relative;margin-left:auto;height:100%;width:min(940px,94vw);
+  background:linear-gradient(160deg,#241811,#160d08);border-left:1px solid #966633;
+  box-shadow:-14px 0 44px rgba(0,0,0,.55);padding:18px clamp(12px,2vw,24px) 28px;
+  overflow-y:auto;transform:translateX(100%);transition:transform .28s ease}
+.wb-modal:not([hidden]) .wb-modal-panel{transform:translateX(0)}
+.wb-modal-panel h2{margin:0 0 12px;color:#ffe9b8;font:800 1.1rem system-ui,sans-serif}
+.wb-modal-close{position:absolute;top:12px;right:14px;width:34px;height:34px;
+  border-radius:999px;font-size:1.15rem;line-height:1;padding:0;cursor:pointer}
+.wb-modal .player-boards{gap:20px}
+
+/* Fit-mode: scale tile-attached card stacks down with the board so they
+   stay inside their tiles.  --fit-k is set on #decks by board.js. */
+body.fit #decks .deck{width:calc(var(--card-w) * var(--scale) * var(--fit-k,1))}
+body.fit #decks .stack{width:calc(var(--card-w) * var(--scale) * var(--fit-k,1));
+  height:calc((var(--card-h) * var(--scale) + 8px) * var(--fit-k,1))}
+body.fit #decks .stack img{transform:scale(calc(var(--scale) * var(--fit-k,1)))}

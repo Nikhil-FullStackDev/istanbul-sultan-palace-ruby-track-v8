@@ -2361,3 +2361,18 @@ refreshGameCodeUI();
 renderSultanPalaceCubes();
 renderDecks();
 setLocked(true);
+
+// Fit-to-screen layout: scale tile-attached card stacks with the board, and
+// keep every attached component aligned when the viewport is resized.
+const FIT_REFERENCE_BOARD_WIDTH=1134; // board width the saved card scales were tuned at
+function applyFitScale(){
+  if(!document.body.classList.contains('fit'))return;
+  const bw=board.getBoundingClientRect().width;
+  if(bw>0) deckRoot.style.setProperty('--fit-k',String(bw/FIT_REFERENCE_BOARD_WIDTH));
+}
+function relayoutFit(){ applyFitScale(); try{ placeAttachments(); placePlayers(); updateReachable(); }catch(_){} }
+relayoutFit();
+requestAnimationFrame(relayoutFit);
+window.addEventListener('load',relayoutFit);
+let _resizeT=0;
+window.addEventListener('resize',()=>{ clearTimeout(_resizeT); _resizeT=setTimeout(relayoutFit,120); });
