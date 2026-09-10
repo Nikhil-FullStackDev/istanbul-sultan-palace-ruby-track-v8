@@ -1769,22 +1769,21 @@ async function onTileClick(name){
     nextTurn();
     return;
   }
-  // Phase 1: leave / pick up an Assistant.
-  let leftAssistantHere=false;
-  if(!isFountain){
-    if(assistantWaitingHere){
-      p.left=p.left.filter(x=>x!==name);p.assistants=Math.min(5,p.assistants+1);
-      addLog(`${p.name} picks up an Assistant at ${name}.`);
-    }else if(p.assistants>0){
-      p.assistants--;p.left.push(name);leftAssistantHere=true;
-    }
+  // Phase 1: pick up an Assistant that is waiting here. Leaving an Assistant is
+  // deferred to Phase 3 — it only happens if the Place's action is carried out
+  // (finishAction(true)). End the turn without acting → no Assistant is left.
+  if(!isFountain && assistantWaitingHere){
+    p.left=p.left.filter(x=>x!==name);p.assistants=Math.min(5,p.assistants+1);
+    addLog(`${p.name} picks up an Assistant at ${name}.`);
   }
+  pendingAssistantDrop = !isFountain && !assistantWaitingHere && p.assistants>0;
   p.pos=name;
   // Phase 2: pay other Merchants here — or decline and end the turn.
   const fee=players.filter(q=>q!==p&&q.pos===name).length*2;
   if(fee && !isFountain){
     if(p.coins<fee){
-      addLog(`${p.name} moves to ${name}${leftAssistantHere?', leaves an Assistant,':''} but cannot pay the ${fee} Lira Merchant fee — the turn ends.`);
+      pendingAssistantDrop=false;
+      addLog(`${p.name} moves to ${name} but cannot pay the ${fee} Lira Merchant fee — the turn ends.`);
       renderAll();nextTurn();return;
     }
     const pay=await modalChoice({title:`${name}: ${fee} Lira in Merchant encounter fees (${fee/2} other merchant${fee>2?'s':''} here).`,options:[
@@ -1792,7 +1791,8 @@ async function onTileClick(name){
       {label:'Decline — end turn',value:'end'}
     ]});
     if(pay!=='pay'){
-      addLog(`${p.name} moves to ${name}${leftAssistantHere?', leaves an Assistant,':''} and declines the ${fee} Lira fee — the turn ends.`);
+      pendingAssistantDrop=false;
+      addLog(`${p.name} moves to ${name} and declines the ${fee} Lira fee — the turn ends.`);
       persistPlayerState();renderAll();nextTurn();return;
     }
     p.coins-=fee;addLog(`${p.name} pays ${fee} Lira in Merchant encounter fees.`);
