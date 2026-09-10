@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs><radialGradient id="g"><stop offset="0" stop-color="#fff0a6"/><stop offset=".5" stop-color="#e6ad45"/><stop offset="1" stop-color="#a66a1e"/></radialGradient></defs>
+  <circle cx="64" cy="64" r="58" fill="#6a3d12" opacity=".35"/>
+  <circle cx="64" cy="60" r="54" fill="url(#g)" stroke="#ffe8a5" stroke-width="4"/>
+  <circle cx="64" cy="60" r="42" fill="none" stroke="#b57524" stroke-width="3"/>
+  <text x="64" y="73" text-anchor="middle" font-family="Georgia,serif" font-size="46" font-weight="700" fill="#6b4218">1</text>
+  <text x="64" y="101" text-anchor="middle" font-family="system-ui,sans-serif" font-size="13" font-weight="800" fill="#6b4218">LIRA</text>
+</svg>

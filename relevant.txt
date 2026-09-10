@@ -1,0 +1,421 @@
+const playerSlotLockShapeButton=document.querySelector('#player-slot-lock-shape');
+if(playerSlotLockShapeButton) playerSlotLockShapeButton.addEventListener('click',()=>{playerSlotLockShapeMode=!playerSlotLockShapeMode; playerSlotLockShapeButton.textContent=playerSlotLockShapeMode?'Finish slot-lock shape':'Edit slot-lock shape'; playerSlotLockShapeButton.setAttribute('aria-pressed',String(playerSlotLockShapeMode)); surface.classList.toggle('slot-lock-shape-mode',playerSlotLockShapeMode); renderPlayerBoards();});
+if(addPlayerSlotLockButton)addPlayerSlotLockButton.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();addPlayerBoardSlotLock()});
+const addPlayerLayerButton=document.querySelector('#add-player-layer');
+if(addPlayerLayerButton)addPlayerLayerButton.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();addPlayerBoardLayer();});
+const playerBoardEditButton=document.querySelector('#player-board-edit');if(playerBoardEditButton)playerBoardEditButton.addEventListener('click',()=>setPlayerBoardEditMode(!playerBoardEditMode));if(playerBoardEditButton){playerBoardEditButton.textContent=playerBoardEditMode?'Exit player-board edit':'Edit player-board';playerBoardEditButton.setAttribute('aria-pressed',String(playerBoardEditMode));playerBoardEditButton.classList.toggle('active',playerBoardEditMode)}
+document.querySelector('#add-palace-layer')?.addEventListener('click',addPalaceLayer); document.querySelector('#add-gem-layer')?.addEventListener('click',addGemstoneLayer); moveGemButton?.addEventListener('click',()=>setGemMoveMode(!gemMoveMode)); setGemMoveMode(false);
+const hideEditingButton=document.querySelector('#hide-editing-controls');
+if(hideEditingButton)hideEditingButton.addEventListener('click',()=>{
+  const hidden=surface.classList.toggle('hide-editing-controls');
+  hideEditingButton.textContent=hidden?'Show layer controls':'Hide layer controls';
+  hideEditingButton.setAttribute('aria-pressed',String(hidden));
+  localStorage.setItem('istanbul-hide-editing-controls',hidden?'1':'0');
+});
+if(localStorage.getItem('istanbul-hide-editing-controls')==='1'&&hideEditingButton){surface.classList.add('hide-editing-controls');hideEditingButton.textContent='Show layer controls';hideEditingButton.setAttribute('aria-pressed','true')}
+document.querySelector('#reset-decks')?.addEventListener('click',()=>{localStorage.removeItem('istanbul-component-positions');localStorage.removeItem('istanbul-removed-decks');location.reload()});
+document.querySelector('#shuffle')?.addEventListener('click',e=>{e.preventDefault();render({randomize:true});});
+
+/* ---------- Play engine ---------- */
+
+const PLAYER_COLORS=['red','blue','green','yellow'];
+const PLAYER_LABELS={red:'Red Merchant',blue:'Blue Merchant',green:'Green Merchant',yellow:'Yellow Merchant'};
+const GOODS=['fabric','spice','fruit','heirloom'];
+const GOOD_LABEL={fabric:'Fabric',spice:'Spice',fruit:'Fruit',heirloom:'Ring'};
+const START_ASSISTANTS=4;
+const START_CART_CAPACITY=2;
+const WIN_RUBIES_DEFAULT=5;
+const actionInfo={
+  'Fountain':{label:'Return any number of assistants.',type:'fountain'},
+  'Wainwright':{label:'Pay 7 Lira for the next cart extension.',type:'wainwright'},
+  'Fabric Warehouse':{label:'Fill Fabric to cart capacity.',type:'warehouse',good:'fabric'},
+  'Spice Warehouse':{label:'Fill Spice to cart capacity.',type:'warehouse',good:'spice'},
+  'Fruit Warehouse':{label:'Fill Fruit to cart capacity.',type:'warehouse',good:'fruit'},
+  'Post Office':{label:'Take the 4 uncovered rewards.',type:'post'},
+  'Caravansary':{label:'Take 2 Bonus cards, then discard 1.',type:'caravan'},
+  'Black Market':{label:'Take 1 non-Ring good and roll 2 dice.',type:'black'},
+  'Tea House':{label:'Choose 3–12 and roll 2 dice.',type:'tea'},
+  'Large Market':{label:'Sell 1–5 demanded goods.',type:'marketLarge'},
+  'Small Market':{label:'Sell 1–5 demanded goods.',type:'marketSmall'},
+  'Police Station':{label:'Free your Family Member to another Place.',type:'police'},
+  'Sultan’s Palace':{label:'Pay the next goods requirement for a Ruby.',type:'palace'},
+  'Small Mosque':{label:'Take the top Small Mosque tile of one colour.',type:'mosqueSmall'},
+  'Great Mosque':{label:'Take the top Great Mosque tile of one colour.',type:'mosqueGreat'},
+  'Gemstone Dealer':{label:'Pay the biggest uncovered number for a Ruby.',type:'gem'}
+};
+const POST_TOP=[{good:'fabric',n:1},{coins:2},{good:'heirloom',n:1},{coins:2}];
+const POST_BOTTOM=[{good:'fruit',n:1},{coins:1},{good:'spice',n:1},{coins:1}];
+const DEMAND_GOODS=[
+  ['heirloom','fabric','fruit','spice','spice'],
+  ['heirloom','fabric','spice','fruit','fruit'],
+  ['fruit','fruit','fruit','fabric','spice'],
+  ['fabric','spice','fruit','fruit','fruit'],
+  ['heirloom','spice','spice','fruit','fruit']
+];
+const MARKET_PAYOUT=[0,2,5,9,14,20];
+const MOSQUE_ABILITY={fabric:'red',heirloom:'blue',fruit:'green',spice:'yellow'};
+const MOSQUE_STACKS={small:{fabric:[2,3],spice:[2,3],fruit:[2,3],heirloom:[2,3]},great:{fabric:[4,5],spice:[4,5],fruit:[4,5],heirloom:[4,5]}};
+let mosqueStacks={small:{},great:{}};
+let players=[];
+const SULTAN_CUBE_KEY='istanbul-sultan-cubes-v1';
+let sultanCubes=JSON.parse(localStorage.getItem(SULTAN_CUBE_KEY)||'{}');
+let selectedSultanCube=null;
+let turn=0,gameOver=false,awaitingAction=false,actionInitiated=false;
+let pendingAssistantDrop=false;
+let winnerTarget=WIN_RUBIES_DEFAULT;
+let lastDiceRoll=null;
+let teaTarget=null;
+let marketQuantities={fabric:0,spice:0,fruit:0,heirloom:0};
+let smallDemandDeck=[],largeDemandDeck=[];
+let smallDemandIndex=0,largeDemandIndex=0;
+let postCubeSlots=[0,2,4,6];
+let palaceRubyIndex=0,gemstoneRubyIndex=0,wainwrightRubyAvailable=true;
+let pendingDice=null;
+let pendingFamilyRewards=[];
+let familyActionTarget=null;
+let familyActionMode=false;
+let caravanChoice=null;
+let caravanPendingCards=[];
+let bonusDeck=Array.from({length:26},(_,i)=>`bonus-${i+1}`),bonusDiscard=[];
+const gameLog=[];
+const diceTray=document.querySelector('#dice-tray');
+const turnStatus=document.querySelector('#turn-status'),turnHint=document.querySelector('#turn-hint'),logEl=document.querySelector('#game-log'),boardsEl=document.querySelector('#player-boards'),endTurnBtn=document.querySelector('#end-turn'),actionBtn=document.querySelector('#do-action'),playerCountSelect=document.querySelector('#player-count');
+
+function safeInt(v,d=0){const n=Number(v);return Number.isFinite(n)?Math.trunc(n):d}
+function activePlayer(){return players[turn]||null}
+function cartCapacity(p){return START_CART_CAPACITY+(p.cartUnlocked||[]).filter(Boolean).length}
+function goodsTotal(p){return GOODS.reduce((s,g)=>s+(p.goods[g]||0),0)}
+function persistPlayerState(){
+  const data={};
+  players.forEach(p=>data[p.color]={coins:p.coins,rubies:p.rubies,bonusCards:p.bonusCards,bonusHand:[...(p.bonusHand||[])],cartUnlocked:[...(p.cartUnlocked||[])],goods:{...p.goods},familyPos:p.familyPos,assistants:p.assistants,left:[...(p.left||[])],mosqueTiles:[...(p.mosqueTiles||[])],pos:p.pos});
+  localStorage.setItem('istanbul-player-state',JSON.stringify(data));
+}
+function loadSavedPlayers(count){
+  const savedState=JSON.parse(localStorage.getItem('istanbul-player-state')||'{}');
+  return Array.from({length:count},(_,i)=>{
+    const color=PLAYER_COLORS[i],s=savedState[color]||{};
+    const bonusHand=Array.isArray(s.bonusHand)?s.bonusHand.slice():[];
+    return {id:i,color,name:PLAYER_LABELS[color],pos:s.pos||'Fountain',assistants:s.assistants??START_ASSISTANTS,left:Array.isArray(s.left)?s.left.slice():[],coins:s.coins??(2+i),rubies:s.rubies??0,bonusCards:bonusHand.length,bonusHand,cartUnlocked:Array.isArray(s.cartUnlocked)?s.cartUnlocked.slice(0,3):[false,false,false],goods:{fabric:0,spice:0,fruit:0,heirloom:0,...(s.goods||{})},familyPos:s.familyPos||'Police Station',mosqueTiles:Array.isArray(s.mosqueTiles)?s.mosqueTiles.slice():[],yellowRecallUsed:false};
+  });
+}
+function addLog(t){gameLog.unshift(t);if(gameLog.length>50)gameLog.length=50}
+function addLira(p,n){p.coins+=n;}
+function addGood(p,g,n){const cap=cartCapacity(p),before=p.goods[g]||0,after=Math.min(cap,before+n),gain=after-before;p.goods[g]=after;syncSultanCubeToGood(p,g);return gain}
+function removeGood(p,g,n){const take=Math.min(p.goods[g]||0,n);p.goods[g]-=take;syncSultanCubeToGood(p,g);return take}
+function canPayGoods(p,cost){return Object.entries(cost).every(([g,n])=>g==='coins'?p.coins>=n:(p.goods[g]||0)>=n)}
+function payGoods(p,cost){Object.entries(cost).forEach(([g,n])=>{if(g==='coins')p.coins-=n;else {p.goods[g]-=n;syncSultanCubeToGood(p,g)}})}
+function refillGood(p,g){const gain=Math.max(0,cartCapacity(p)-(p.goods[g]||0));if(gain)addGood(p,g,gain);return gain}
+function addRuby(p,note){p.rubies++;addLog(`${p.name} takes a Ruby${note?` (${note})`:''}.`)}
+function endGameTrigger(){return players.some(p=>p.rubies>=winnerTarget)}
+function prepareNewRoundEnd(){
+  if(!endGameTrigger())return false;
+  addLog(`A player has reached ${winnerTarget} Rubies. Finish the current round, then determine the winner.`);
+  gameOver='round';
+  return true;
+}
+function finalWinner(){
+  const sorted=[...players].sort((a,b)=>b.rubies-a.rubies||b.coins-a.coins||goodsTotal(b)-goodsTotal(a)||(b.bonusHand?.length||0)-(a.bonusHand?.length||0));
+  return sorted[0];
+}
+
+function initMosqueStacks(){
+  const count=players.length;
+  mosqueStacks={small:{},great:{}};
+  GOODS.forEach(g=>{
+    mosqueStacks.small[g]=MOSQUE_STACKS.small[g].filter(v=>count!==2||v!==3).filter(v=>count!==3||v!==5);
+    mosqueStacks.great[g]=MOSQUE_STACKS.great[g].filter(v=>count!==2||v!==3).filter(v=>count!==3||v!==5);
+  });
+}
+function drawBonus(){
+  if(!bonusDeck.length&&bonusDiscard.length){bonusDeck=shuffle(bonusDiscard);bonusDiscard=[]}
+  return bonusDeck.shift()||null;
+}
+function takeBonus(p,n=1,fromDiscard=false){
+  for(let i=0;i<n;i++){
+    const card=fromDiscard?bonusDiscard.pop()||drawBonus():drawBonus();
+    if(!card)break;
+    p.bonusHand=(p.bonusHand||[]);p.bonusHand.push(card);p.bonusCards=p.bonusHand.length;
+  }
+}
+function discardOneBonus(p,cardId){
+  const hand=p.bonusHand||[];
+  const idx=cardId?hand.indexOf(cardId):0;
+  if(idx<0)return false;
+  const [card]=hand.splice(idx,1);bonusDiscard.push(card);p.bonusCards=hand.length;return true;
+}
+function createDemandDeck(){return shuffle([0,1,2,3,4])}
+function currentDemand(type){const deck=type==='small'?smallDemandDeck:largeDemandDeck;const idx=type==='small'?smallDemandIndex:largeDemandIndex;return deck[idx%deck.length]??0}
+function demandCounts(cardIndex){const out={fabric:0,spice:0,fruit:0,heirloom:0};(DEMAND_GOODS[cardIndex]||[]).forEach(g=>out[g]++);return out}
+function advanceDemand(type){if(type==='small')smallDemandIndex=(smallDemandIndex+1)%5;else largeDemandIndex=(largeDemandIndex+1)%5}
+
+const DICE_FACES=['⚀','⚁','⚂','⚃','⚄','⚅'];
+function rollDie(){return 1+Math.floor(Math.random()*6)}
+function rollDice(){return [rollDie(),rollDie()]}
+function ensureDiceOverlay(){
+  let overlay=document.querySelector('#board-dice-overlay');
+  if(!overlay){overlay=document.createElement('div');overlay.id='board-dice-overlay';document.querySelector('#play-surface')?.append(overlay)}
+  return overlay;
+}
+function showBoardDiceAnimation(dice,caption){
+  const overlay=ensureDiceOverlay();if(!overlay)return;
+  clearInterval(showBoardDiceAnimation.timer);clearTimeout(showBoardDiceAnimation.hideTimer);
+  let ticks=0;
+  const renderFaces=(vals,rolling=true)=>{overlay.innerHTML=`<div class="board-dice-title">${caption}</div><div class="board-dice-pair">${vals.map((d,i)=>`<span class="board-die" style="--delay:${i*70}ms">${DICE_FACES[d-1]}</span>`).join('')}</div><div class="board-dice-result">${rolling?'Rolling…':`Result: ${vals[0]} + ${vals[1]} = ${vals[0]+vals[1]}`}</div>`;overlay.classList.add('is-visible');overlay.classList.toggle('is-rolling',rolling)};
+  renderFaces([rollDie(),rollDie()],true);
+  showBoardDiceAnimation.timer=setInterval(()=>{ticks++;if(ticks>=18){clearInterval(showBoardDiceAnimation.timer);renderFaces(dice,false);showBoardDiceAnimation.hideTimer=setTimeout(()=>overlay.classList.remove('is-visible'),3000);return}renderFaces([rollDie(),rollDie()],true)},120);
+}
+function applyDiceBonusOption(mode){
+  const p=activePlayer();
+  if(!p||!pendingDice||!pendingDice.canModify)return;
+  if(!(p.bonusHand||[]).length){pendingDice.canModify=false;renderAll();return}
+  let cardId=p.bonusHand[0];
+  if(mode==='keep'){pendingDice.canModify=false;finalizePendingDice();return}
+  if(mode==='reroll'){
+    pendingDice.dice=rollDice();
+  }else if(mode.startsWith('set')){
+    const parts=mode.slice(3).split(':');
+    const index=safeInt(parts[0],0);const value=Math.max(1,Math.min(6,safeInt(parts[1],1)));
+    if(index<0||index>1)return;
+    pendingDice.dice[index]=value;
+  }else return;
+  discardOneBonus(p,cardId);
+  pendingDice.total=pendingDice.dice[0]+pendingDice.dice[1];
+  pendingDice.canModify=false;
+  addLog(`${p.name} uses a Bonus card to modify the ${pendingDice.title} dice result.`);
+  showBoardDiceAnimation(pendingDice.dice,pendingDice.title);
+  persistPlayerState();
+  finalizePendingDice();
+}
+
+function finalizePendingDice(){
+  const p=activePlayer();if(!pendingDice||!p)return;
+  const ctx=pendingDice;pendingDice=null;
+  if(ctx.type==='tea'){
+    const payout=ctx.total>=ctx.target?ctx.target:2;p.coins+=payout;addLog(`${p.name} rolls ${ctx.dice[0]} + ${ctx.dice[1]} = ${ctx.total} at Tea House and receives ${payout} Lira.`);
+  }else if(ctx.type==='black'){
+    const blue=ctx.total>=11?3:ctx.total>=9?2:ctx.total>=7?1:0;if(blue)addGood(p,'heirloom',blue);addLog(`${p.name} rolls ${ctx.dice[0]} + ${ctx.dice[1]} = ${ctx.total} at Black Market${blue?` and gains ${blue} Ring${blue>1?'s':''}`:''}.`);
+    if(ctx.extraGood)addGood(p,ctx.extraGood,1);
+  }
+  lastDiceRoll={dice:[...ctx.dice],total:ctx.total,caption:ctx.title};
+  persistPlayerState();finishAction(true);
+}
+
+const POST_KEY='istanbul-post-office-cube-slots-v1';
+const POST_DIR_KEY='istanbul-post-office-cube-direction-v1';
+postCubeSlots=JSON.parse(localStorage.getItem(POST_KEY)||'null');if(!Array.isArray(postCubeSlots)||postCubeSlots.length!==4)postCubeSlots=[0,2,4,6];
+let postCubeDirection=localStorage.getItem(POST_DIR_KEY)||((postCubeSlots.length===4&&[1,3,5,7].every(x=>postCubeSlots.includes(x)))?'up':'down');
+function persistPostOfficeState(){localStorage.setItem(POST_KEY,JSON.stringify(postCubeSlots));localStorage.setItem(POST_DIR_KEY,postCubeDirection)}
+function advancePostOffice(){
+  // Eight ordered Post Office layers: upper = 1,3,5,7 (0,2,4,6),
+  // lower = 2,4,6,8 (1,3,5,7). Each completed action moves exactly one cube,
+  // always from the left, first down across all four cubes, then back up across
+  // all four cubes, repeating.
+  const next=[...postCubeSlots].map(Number);
+  const upper=[0,2,4,6], lower=[1,3,5,7];
+  const occupied=new Set(next);
+  if(postCubeDirection==='down'){
+    const source=upper.find(slot=>occupied.has(slot));
+    if(source!==undefined){
+      const i=next.indexOf(source);
+      if(i>=0)next[i]=source+1;
+    }
+    if(lower.every(slot=>next.includes(slot)))postCubeDirection='up';
+  }else{
+    const source=lower.find(slot=>occupied.has(slot));
+    if(source!==undefined){
+      const i=next.indexOf(source);
+      if(i>=0)next[i]=source-1;
+    }
+    if(upper.every(slot=>next.includes(slot)))postCubeDirection='down';
+  }
+  postCubeSlots=next;
+  persistPostOfficeState();
+}
+function currentPostRewards(){
+  return [0,1,2,3].map(col=>postCubeSlots[col]!==undefined&&postCubeSlots.find(v=>v===col)!==undefined?POST_BOTTOM[col]:POST_TOP[col]);
+}
+function postUncovered(){
+  return [0,1,2,3].map(col=>{
+    const bottom=postCubeSlots.includes(col+4);return bottom?POST_TOP[col]:POST_BOTTOM[col];
+  });
+}
+
+const PALACE_COSTS=[
+ {fabric:1,spice:1,fruit:1,heirloom:1},
+ {fabric:2,spice:2,fruit:1,heirloom:1},
+ {fabric:2,spice:1,fruit:2,heirloom:1},
+ {fabric:1,spice:2,fruit:1,heirloom:2},
+ {fabric:2,spice:1,fruit:1,heirloom:2}
+];
+const GEMSTONE_VALUES=[23,22,21,20,19,18,17,16,15,14,13,12];
+
+function remainingGemValue(){return GEMSTONE_VALUES[gemstoneRubyIndex]??null}
+function hideGemRubyLayer(indexFromTop){
+  try{ensureGemstoneTrackLayers();const layer=gemstoneLayers.find(l=>Number(l.trackIndex)===indexFromTop+1);if(layer)layer.claimed=true;persistGemstoneLayers();}catch(_){}}
+function renderGemClaims(){try{const host=document.querySelector('.gemstone-layer-host');if(!host)return;host.querySelectorAll('.gemstone-board-layer').forEach(el=>{const l=gemstoneLayers.find(x=>x.id===el.dataset.gemLayerId);if(l?.claimed){el.style.opacity='0.2';el.querySelector('.gem-track-ruby-3d')?.remove();el.querySelector('.gem-ruby-number')?.remove()}})}catch(_){}
+}
+function resolveGemstone(p){
+  const cost=remainingGemValue();if(cost===null){addLog('No Gemstones remain on the track.');return true}
+  if(p.coins<cost){addLog(`${p.name} needs ${cost} Lira for the next Gemstone Dealer Ruby.`);return true}
+  p.coins-=cost;hideGemRubyLayer(gemstoneRubyIndex);gemstoneRubyIndex++;addRuby(p,`Gemstone Dealer (${cost} Lira)`);persistPlayerState();return true;
+}
+function resolvePalace(p){
+  const cost=PALACE_COSTS[Math.min(palaceRubyIndex,PALACE_COSTS.length-1)];
+  if(!canPayGoods(p,cost)){addLog(`${p.name} needs ${Object.entries(cost).map(([g,n])=>`${n} ${GOOD_LABEL[g]}`).join(', ')} for the next Sultan’s Palace Ruby.`);return true}
+  payGoods(p,cost);palaceRubyIndex++;addRuby(p,'Sultan’s Palace');persistPlayerState();return true;
+}
+function unlockCartSlot(p){
+  const idx=p.cartUnlocked.findIndex(v=>!v);if(idx<0){addLog('All 3 wheelbarrow extensions are already unlocked.');return true}
+  if(p.coins<7){addLog(`${p.name} needs 7 Lira for the next wheelbarrow extension.`);return true}
+  p.coins-=7;p.cartUnlocked[idx]=true;addLog(`${p.name} buys wheelbarrow extension ${idx+1} for 7 Lira.`);
+  if(idx===2&&wainwrightRubyAvailable){wainwrightRubyAvailable=false;addRuby(p,'completing the wheelbarrow');}
+  persistPlayerState();return true;
+}
+
+function acquireMosque(p,mosque,color){
+  const stack=mosqueStacks[mosque]?.[color]||[];const req=stack[0];if(!req){addLog(`No ${GOOD_LABEL[color]} tile remains at the ${mosque} Mosque.`);return true}
+  const key=`${mosque}-${color}`;
+  if((p.mosqueTiles||[]).some(t=>t===key)){addLog(`${p.name} already owns that Mosque tile.`);return true}
+  if((p.goods[color]||0)<req){addLog(`${p.name} needs ${req} ${GOOD_LABEL[color]} for this Mosque tile.`);return true}
+  p.goods[color]-=req;syncSultanCubeToGood(p,color);stack.shift();p.mosqueTiles.push(key);addLog(`${p.name} buys the ${mosque} ${GOOD_LABEL[color]} Mosque tile (${req} goods requirement).`);
+  if(p.mosqueTiles.includes(`small-${color}`)&&p.mosqueTiles.includes(`great-${color}`)&&!p.mosqueTiles.includes(`ruby-${color}`)){p.mosqueTiles.push(`ruby-${color}`);addRuby(p,`${GOOD_LABEL[color]} Mosque set`)}
+  persistPlayerState();return true;
+}
+function hasAbility(p,ability){return (p.mosqueTiles||[]).some(k=>k===ability)
+}
+function useYellowRecall(p){
+  if(!hasAbility(p,'yellow')||p.yellowRecallUsed||p.coins<2||!p.left.length)return false;
+  p.coins-=2;p.left.shift();p.assistants=Math.min(5,p.assistants+1);p.yellowRecallUsed=true;addLog(`${p.name} uses the Yellow Mosque ability to recall an Assistant.`);persistPlayerState();return true;
+}
+function performGreenBonus(p){
+  if(!hasAbility(p,'green')||p.coins<2)return;
+  const good=promptGoodChoice();if(!good)return;p.coins-=2;addGood(p,good,1);addLog(`${p.name} pays 2 Lira for one additional ${GOOD_LABEL[good]}.`);persistPlayerState();renderAll();
+}
+function promptGoodChoice(){const v=window.prompt('Choose a good: fabric, spice, fruit, or heirloom','fabric');return GOODS.includes(v?.toLowerCase())?v.toLowerCase():null}
+
+function renderActionUI(){
+  const p=activePlayer();
+  if(!p||!awaitingAction){ if(typeof diceTray!=='undefined'&&diceTray){diceTray.innerHTML='';diceTray.classList.remove('has-roll');} return; }
+  const actionPlace=familyActionMode&&familyActionTarget?familyActionTarget:p.pos;
+  const info=actionInfo[actionPlace];if(!info)return;
+  if(info.type==='tea'){
+    const n=teaTarget??6;diceTray.innerHTML=`<span class="dice-caption">Tea House target</span><input id="tea-target" class="tea-target" type="number" min="3" max="12" value="${n}"><span class="dice-caption">Press <strong>Do action at Tea House</strong> to roll.</span>`;diceTray.classList.add('has-roll');
+  }else if(info.type==='black'){
+    diceTray.innerHTML=`<span class="dice-caption">Choose 1 non-Ring good.</span><select id="black-good" class="tea-target"><option value="fabric">Fabric</option><option value="spice">Spice</option><option value="fruit">Fruit</option></select><span class="dice-caption">Press <strong>Do action at Black Market</strong> to roll.</span>`;diceTray.classList.add('has-roll');
+  }else if(info.type==='marketSmall'||info.type==='marketLarge'){
+    const type=info.type==='marketSmall'?'small':'large',idx=currentDemand(type),goods=demandCounts(idx);const img=`assets/cards-review/cards/demand-tiles/demand-tile-${String(idx+1).padStart(2,'0')}-front.png`;
+    diceTray.innerHTML=`<img src="${img}" alt="Demand tile" style="width:52px;height:76px;object-fit:cover;border-radius:6px"><span class="dice-caption">Sell 1–5 demanded goods</span>${GOODS.filter(g=>goods[g]>0).map(g=>`<label style="display:flex;align-items:center;gap:4px">${GOOD_LABEL[g]} <input class="market-q" data-good="${g}" type="number" min="0" max="${Math.min(goods[g],p.goods[g]||0)}" value="${Math.min(marketQuantities[g]||0,p.goods[g]||0)}" style="width:46px"></label>`).join('')}<button type="button" id="sell-market">Sell</button>`;diceTray.classList.add('has-roll');
+  }else if(info.type==='mosqueSmall'||info.type==='mosqueGreat'){
+    const mosque=info.type==='mosqueSmall'?'small':'great';diceTray.innerHTML=`<span class="dice-caption">Choose a colour for the top ${mosque} Mosque tile.</span>${GOODS.map(g=>{const req=mosqueStacks[mosque][g]?.[0];return `<button type="button" class="mosque-choice" data-mosque="${mosque}" data-good="${g}" ${req?'':'disabled'}>${GOOD_LABEL[g]}${req?` (${req})`:''}</button>`}).join('')}`;diceTray.classList.add('has-roll');
+  }else if(info.type==='fountain'){
+    const opts=players.length&&p.left.length?p.left.map(name=>`<label style="display:block"><input type="checkbox" class="fountain-pick" value="${name}"> ${name}</label>`).join(''):'<span class="dice-caption">No Assistants are away.</span>';diceTray.innerHTML=`<div><strong>Return Assistants</strong>${opts}</div><button type="button" id="return-fountain">Return selected</button>`;diceTray.classList.add('has-roll');
+  }else if(info.type==='post'){
+    const r=postUncovered();diceTray.innerHTML=`<span class="dice-caption">Uncovered: ${r.map(x=>x.coins?`${x.coins} Lira`:GOOD_LABEL[x.good]).join(', ')}</span><button type="button" id="post-claim">Take Post Office rewards</button>`;diceTray.classList.add('has-roll');
+  }else if(info.type==='caravan'){
+    if(caravanChoice==='discard'&&caravanPendingCards.length){
+      const cards=caravanPendingCards.map((id,i)=>`<button type="button" class="caravan-card-choice" data-caravan-card="${id}" title="Discard this card"><img src="assets/cards-review/cards/icon-bonus-cards/icon-bonus-card-01.png" alt="Bonus card"><span>Card ${i+1}</span></button>`).join('');
+      diceTray.innerHTML=`<span class="dice-caption">Choose 1 of the 2 cards you just drew to discard.</span><div class="caravan-card-choices">${cards}</div>`;
+    }else{
+      diceTray.innerHTML=`<span class="dice-caption">Press <strong>Do action at Caravansary</strong> to draw 2 Bonus cards.</span>`;
+    }
+    diceTray.classList.add('has-roll');
+  }else if(info.type==='palace'){
+    const c=PALACE_COSTS[Math.min(palaceRubyIndex,PALACE_COSTS.length-1)];diceTray.innerHTML=`<span class="dice-caption">Next Ruby costs: ${Object.entries(c).map(([g,n])=>`${n} ${GOOD_LABEL[g]}`).join(', ')}</span>`;diceTray.classList.add('has-roll');
+  }else if(info.type==='gem'){
+    const c=remainingGemValue();diceTray.innerHTML=`<span class="dice-caption">Next Ruby price: ${c??'none'} Lira</span>`;diceTray.classList.add('has-roll');
+  }else if(info.type==='wainwright'){
+    diceTray.innerHTML=`<span class="dice-caption">Wheelbarrow: ${p.cartUnlocked.filter(Boolean).length}/3 extensions unlocked. Cost: 7 Lira.</span>`;diceTray.classList.add('has-roll');
+  }else if(info.type==='warehouse'){
+    const g=info.good;diceTray.innerHTML=`<span class="dice-caption">${GOOD_LABEL[g]}: ${p.goods[g]||0}/${cartCapacity(p)}</span>${hasAbility(p,'green')?'<button type="button" id="green-bonus">Use Green Mosque: +1 good for 2 Lira</button>':''}`;diceTray.classList.add('has-roll');
+  }else if(info.type==='police'){
+    if(familyActionTarget){diceTray.innerHTML=`<span class="dice-caption">Family Member destination: ${familyActionTarget}. Press Do action to resolve that tile without encounters.</span>`;diceTray.classList.add('has-roll')}
+    else diceTray.innerHTML=`<span class="dice-caption">Choose a destination for your Family Member.</span>`;
+  }else diceTray.classList.remove('has-roll');
+}
+
+function beginTileAction(p,name){teaTarget=null;lastDiceRoll=null;pendingDice=null;marketQuantities={fabric:0,spice:0,fruit:0,heirloom:0};if(name==='Tea House')teaTarget=6}
+
+function resolveCore(p,name,{skipEncounters=false}={}){
+  const info=actionInfo[name];if(!info)return true;const type=info.type;
+  if(type==='warehouse'){const gain=refillGood(p,info.good);addLog(`${p.name} fills ${GOOD_LABEL[info.good]} by ${gain} to ${cartCapacity(p)}.`);return true}
+  if(type==='wainwright')return unlockCartSlot(p);
+  if(type==='post'){
+    postUncovered().forEach(r=>r.coins?addLira(p,r.coins):addGood(p,r.good,r.n));
+    advancePostOffice();
+    // Re-render the board immediately so the grey cube visibly moves to its new Post Office layer.
+    addLog(`${p.name} takes the 4 uncovered Post Office rewards.`);
+    persistPostOfficeState();
+    persistPlayerState();
+    render({randomize:false});
+    return true;
+  }
+  if(type==='caravan'){
+    caravanPendingCards=[];
+    for(let i=0;i<2;i++){
+      const card=drawBonus();
+      if(card){
+        p.bonusHand=(p.bonusHand||[]);p.bonusHand.push(card);caravanPendingCards.push(card);
+      }
+    }
+    p.bonusCards=p.bonusHand.length;
+    if(caravanPendingCards.length){
+      caravanChoice='discard';
+      persistPlayerState();
+      addLog(`${p.name} draws ${caravanPendingCards.length} Bonus cards at the Caravansary and must discard 1.`);
+    }else{
+      addLog('No Bonus cards are available at the Caravansary.');
+      caravanChoice=null;
+      caravanPendingCards=[];
+    }
+    return false;
+  }
+  if(type==='fountain')return false;
+  if(type==='palace')return resolvePalace(p);
+  if(type==='gem')return resolveGemstone(p);
+  if(type==='mosqueSmall'||type==='mosqueGreat')return false;
+  if(type==='tea'){
+    if(!pendingDice){const target=safeInt(document.querySelector('#tea-target')?.value??teaTarget,teaTarget??6);if(target<3||target>12){addLog('Tea House target must be 3–12.');return false}teaTarget=target;const dice=rollDice();pendingDice={type:'tea',target,dice,total:dice[0]+dice[1],title:'Tea House',canModify:(p.bonusHand||[]).length>0};showBoardDiceAnimation(dice,'Tea House');}
+    return false;
+  }
+  if(type==='black'){
+    if(!pendingDice){const good=document.querySelector('#black-good')?.value||'fabric';const dice=rollDice();pendingDice={type:'black',extraGood:good,dice,total:dice[0]+dice[1],title:'Black Market',canModify:(p.bonusHand||[]).length>0};showBoardDiceAnimation(dice,'Black Market');}
+    return false;
+  }
+  if(type==='marketSmall'||type==='marketLarge'){
+    const market=type==='marketSmall'?'small':'large',idx=currentDemand(market),need=demandCounts(idx);const qs={...marketQuantities};let count=0;
+    document.querySelectorAll('.market-q').forEach(i=>{const g=i.dataset.good;qs[g]=Math.max(0,Math.min(need[g]||0,p.goods[g]||0,safeInt(i.value,0)));i.value=String(qs[g]);count+=qs[g]});
+    if(count<1||count>5){addLog('Choose between 1 and 5 goods to sell.');return false}
+    if(GOODS.some(g=>qs[g]>(p.goods[g]||0))){addLog('You cannot sell more goods than you carry.');return false}
+    GOODS.forEach(g=>{p.goods[g]-=qs[g];syncSultanCubeToGood(p,g)});p.coins+=MARKET_PAYOUT[count];advanceDemand(market);marketQuantities=qs;addLog(`${p.name} sells ${count} demanded goods at the ${market==='small'?'Small':'Large'} Market for ${MARKET_PAYOUT[count]} Lira.`);persistPlayerState();return true;
+  }
+  if(type==='police'){
+    if(!p.familyPos||p.familyPos!=='Police Station')return true;
+    familyActionTarget=familyActionTarget||'Fountain';familyActionMode=true;p.familyPos=familyActionTarget;beginTileAction(p,familyActionTarget);addLog(`${p.name} frees the Family Member to ${familyActionTarget}.`);return false;
+  }
+  return true;
+}
+
+function finishAction(placeAssistant=false){
+  const p=activePlayer();
+  if(placeAssistant && pendingAssistantDrop && p && p.pos!=='Fountain' && p.assistants>0 && !p.left.includes(p.pos)){
+    p.assistants--;
+    p.left.push(p.pos);
+    addLog(`${p.name} completes the action at ${p.pos} and leaves an Assistant there.`);
+  }
+  pendingAssistantDrop=false;
+  awaitingAction=false;actionInitiated=true;familyActionMode=false;familyActionTarget=null;teaTarget=null;marketQuantities={fabric:0,spice:0,fruit:0,heirloom:0};caravanChoice=null;caravanPendingCards=[];persistPlayerState();
+  if(endGameTrigger()&&!gameOver)addLog('The game is entering the final round after this turn.');
+  resolvePendingFamilyRewards();
+}
+function resolvePendingFamilyRewards(){
+  if(pendingFamilyRewards.length){renderAll();return}
+  if(gameOver==='round'&&turn===0){const w=finalWinner();gameOver=true;addLog(`🏆 ${w.name} wins with ${w.rubies} Rubies.`)}else nextTurn();
+}
+function showFamilyRewardUI(){
+  const p=activePlayer();if(!p||!pendingFamilyRewards.length)return;
+  const target=pendingFamilyRewards[0];const panel=document.querySelector('.turn-actions');if(!panel)return;
+  const existing=document.querySelector('#family-reward-ui');existing?.remove();const el=document.createElement('div');el.id='family-reward-ui';el.innerHTML=`<span>Family Member caught: ${target}. Reward:</span> <button type="button" data-family-reward="bonus">1 Bonus card</button> <button type="button" data-family-reward="lira">3 Lira</button>`;panel.append(el);
+  el.querySelectorAll('[data-family-reward]').forEach(b=>b.onclick=()=>{const choice=b.dataset.familyReward;if(choice==='bonus')takeBonus(p,1);else p.coins+=3;addLog(`${p.name} takes ${choice==='bonus'?'1 Bonus card':'3 Lira'} for catching ${target}'s Family Member.`);pendingFamilyRewards.shift();persistPlayerState();el.remove();if(pendingFamilyRewards.length)showFamilyRewardUI();else resolvePendingFamilyRewards()});
+}
+function afterMoveFamilyEncounters(location,p){
+  pendingFamilyRewards=players.filter(q=>q!==p&&q.familyPos===location&&location!=='Police Station').map(q=>{q.familyPos='Police Station';return q.name});

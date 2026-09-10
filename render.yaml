@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: istanbul-sultan-palace-ruby-track
+    runtime: static
+    buildCommand: ""
+    staticPublishPath: .
+    pullRequestPreviewsEnabled: false

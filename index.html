@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Istanbul — Board Layout</title><link rel="stylesheet" href="board.css?v=20260909u"><style>.tile{position:relative}.tile-slot{top:0!important;left:0!important;width:100%!important;height:100%!important}.deck{will-change:transform}</style></head>
+<body><main>
+  <header>
+    <p class="eyebrow">Board assembly · base game · build 20260909u</p>
+    <h1>Istanbul <em>Market District</em></h1>
+    <p class="intro">The 16-place board, plus the card decks that start beside it. Unlock the layout to drag a deck wherever you want it — once a piece is dropped on a tile it stays fixed there. Set the number of merchants below, then move 1–2 places per turn from the Fountain. Player boards are larger. Use “Add player-board layer” to create square editable points; player-board layers can be moved, locked/unlocked, and removed. Sultan's Palace layers can also be resized. Palace cubes can be dropped onto layers.</p>
+</header>
+  <section id="play-surface" class="play-surface" aria-label="Istanbul board and movable components">
+    <section class="table" aria-label="Istanbul board layout"><div class="board-frame"><div id="board" class="board"></div></div></section>
+    <section id="game-panel" class="game-panel" aria-label="Player turn and status">
+      <div class="setup-row">
+        <span class="setup-label">New game with</span>
+        <div class="player-count-buttons" role="group" aria-label="Number of players">
+          <button type="button" data-players="2">2 players</button>
+          <button type="button" data-players="3">3 players</button>
+          <button type="button" data-players="4">4 players</button>
+        </div>
+        <span class="game-code-box">Board code <code id="game-code">—</code><button id="copy-code" type="button">Copy</button></span>
+        <span class="join-box"><input id="join-code" type="text" placeholder="paste a code" maxlength="14" autocomplete="off" spellcheck="false"><button id="join-btn" type="button">Join</button></span>
+      </div>
+      <p class="setup-hint">Pick a player count for a fresh random board. Share the <strong>board code</strong> — anyone who pastes it and clicks <strong>Join</strong> gets the identical layout and player count. (Play is local — take turns on this device.)</p>
+      <div class="turn-row">
+        <div id="turn-status" class="turn-status">Setting up…</div>
+        <div class="turn-actions"><button id="do-action" type="button" class="do-action">Move to a tile first</button><button id="end-turn" type="button">End turn</button></div>
+      </div>
+      <p id="turn-hint" class="turn-hint"></p>
+      <div id="dice-tray" class="dice-tray"></div>
+      <ol id="game-log" class="game-log" aria-label="Recent actions"></ol>
+      <div id="player-boards" class="player-boards" aria-label="Player boards"></div>
+    </section>
+    <section class="deck-area" aria-label="Card supply and placement tray"><div class="deck-note"><strong>Card placement tray</strong><span>Unlock, then drag an entire stack onto the board. Once it lands on a tile it locks there permanently.</span></div><div class="card-supply"><div class="card-supply-slot"><strong>Bonus deck</strong><img src="assets/cards-review/cards/icon-bonus-cards/icon-bonus-card-01.png" alt="Bonus card deck"><span>Draw through a tile action</span></div><div class="card-supply-slot"><strong>Bonus discard</strong><div id="global-bonus-discard" class="global-discard-slot"><span>Discard pile · 0</span></div></div><div class="card-supply-slot"><strong>Other card supply</strong><span>Market demand / Mosque tiles are handled by their tile actions.</span></div></div></section>
+    <div id="decks" class="decks" data-locked="true"></div>
+  </section>
+</main><script src="board.js?v=20260909u"></script></body></html>
