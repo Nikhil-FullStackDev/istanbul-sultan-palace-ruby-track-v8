@@ -262,17 +262,16 @@
 .gemstone-layer-controls button{min-width:25px;padding:2px 6px;border:1px solid #f0c469;border-radius:5px;background:#d3953b;color:#2d1a0d;font:800 .72rem/1 system-ui,sans-serif;cursor:pointer}
 .gemstone-board-layer .layer-index{position:absolute;right:-8px;top:-8px;min-width:18px;height:18px;padding:0 4px;border-radius:999px;display:grid;place-items:center;background:#d3953b;color:#2d1a0d;border:1px solid #ffe7af;font:800 .62rem/1 system-ui,sans-serif;pointer-events:none}
 
-/* Global presentation mode: hide the editable layer overlays (boxes, outlines,
-   index numbers, control buttons, track rubies, slot locks) so the board art,
-   cards and game tokens read cleanly. Actual pieces -- merchants, family
-   members, assistants, posted-mail cubes, palace requirement cubes -- stay. */
+/* Global presentation mode: hide the editable layer scaffolding -- boxes,
+   dashed outlines, index numbers, control buttons, add-layer buttons -- so the
+   board art, cards and game tokens read cleanly. Kept visible: merchants,
+   family members, assistants, posted-mail cubes, palace requirement markers,
+   the Gemstone Dealer ruby track, and the wheelbarrow (player-board) slot
+   locks -- just their outlines/numbers/handles are stripped. */
 .play-surface.hide-editing-controls .palace-layer-host,
-.play-surface.hide-editing-controls .gemstone-layer-host,
 .play-surface.hide-editing-controls .post-office-layer-host,
 .play-surface.hide-editing-controls .post-office-add-layer,
 .play-surface.hide-editing-controls .player-board-layers-layer,
-.play-surface.hide-editing-controls .player-board-slot-locks,
-.play-surface.hide-editing-controls .player-board-slot-lock,
 .play-surface.hide-editing-controls .palace-layer-controls,
 .play-surface.hide-editing-controls .post-office-layer-controls,
 .play-surface.hide-editing-controls .gemstone-layer-controls,
@@ -284,6 +283,8 @@
 .play-surface.hide-editing-controls .gem-ruby-number,
 .play-surface.hide-editing-controls .layer-label,
 .play-surface.hide-editing-controls .layer-index{display:none!important}
+/* Gemstone ruby track: keep the rubies, drop the boxes/outlines. */
+.play-surface.hide-editing-controls .gemstone-board-layer{border-color:transparent!important;background:transparent!important;box-shadow:none!important;cursor:default!important;pointer-events:none!important}
 
 /* --- On-board dice roll animation --- */
 #board-dice-overlay{
