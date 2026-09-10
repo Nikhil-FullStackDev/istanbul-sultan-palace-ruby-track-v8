@@ -1,9 +1,12 @@
-/* Auto-seeds a first-time visitor with the reference board arrangement.
-   Runs before board.js. Only fills keys that are absent, and only once
-   (guarded by the flag), so a visitor's own saved layout and any reset
-   are always respected. */
+/* One-time seed of the reference board arrangement for this browser.
+   Loads before board.js. The versioned flag is set ONLY here, so its
+   absence means this browser has never been seeded with this set -- in
+   that case we overwrite any keys board.js may have auto-persisted so a
+   first view always shows the intended layout. Once the flag is set we
+   never touch storage again, so the visitor's own edits and the in-app
+   reset button are fully respected thereafter. */
 (function(){
-  var FLAG = 'istanbul-defaults-seeded-v2';
+  var FLAG = 'istanbul-defaults-seeded-v3';
   var SEED = {
   "istanbul-post-office-layers-v5-persistent": "[{\"id\":\"post-layer-1788015217833-1\",\"left\":20.29443789364248,\"top\":63.646921855544406,\"size\":12,\"fixed\":false},{\"id\":\"post-layer-1788015428028-2\",\"left\":19.683470840270083,\"top\":79.23075436886069,\"size\":12,\"fixed\":false},{\"id\":\"post-layer-1788015435798-3\",\"left\":31.733535391066404,\"top\":64.00109464711885,\"size\":12,\"fixed\":false},{\"id\":\"post-layer-1788015441871-4\",\"left\":30.828130444051524,\"top\":79.93913372907443,\"size\":12,\"fixed\":false},{\"id\":\"post-layer-1788015450903-5\",\"left\":42.96650389876926,\"top\":64.04205055426812,\"size\":12,\"fixed\":false},{\"id\":\"post-layer-1788015463043-6\",\"left\":42.061098951754374,\"top\":79.62589657841035,\"size\":12,\"fixed\":false},{\"id\":\"post-layer-1788015469909-7\",\"left\":53.522265251094396,\"top\":65.10459595064333,\"size\":12,\"fixed\":false},{\"id\":\"post-layer-1788015475239-8\",\"left\":53.79462311073511,\"top\":79.27172378683592,\"size\":12,\"fixed\":false}]",
   "istanbul-sultan-palace-state-v2": "0",
@@ -51,7 +54,7 @@
 };
   try{
     if(localStorage.getItem(FLAG)) return;
-    for(var k in SEED){ if(Object.prototype.hasOwnProperty.call(SEED,k) && localStorage.getItem(k)==null){ localStorage.setItem(k, SEED[k]); } }
+    for(var k in SEED){ if(Object.prototype.hasOwnProperty.call(SEED,k)){ localStorage.setItem(k, SEED[k]); } }
     localStorage.setItem(FLAG, '1');
   }catch(e){}
 })();
