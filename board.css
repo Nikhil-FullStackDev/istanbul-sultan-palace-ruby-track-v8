@@ -523,8 +523,8 @@ body.fit #side-rail{flex:1 1 auto;min-width:0;margin-left:auto;height:100%;
   display:flex;flex-direction:column;gap:8px;max-width:min(52vw,680px)}
 body.fit #game-panel{flex:0 0 auto;max-height:min(48%,340px);margin:0;
   padding:10px 12px;border-radius:14px;display:flex;flex-direction:column;gap:8px;overflow-y:auto}
-body.fit .setup-row{padding-bottom:6px;gap:6px}
-body.fit .setup-hint{display:none}
+/* Game setup (player count, board code, join) lives in the lobby now — never in-game. */
+body.fit .setup-row,body.fit .setup-hint{display:none!important}
 body.fit .turn-row{gap:6px}
 body.fit .turn-status{font-size:.95rem}
 body.fit .turn-hint{font-size:.74rem}
@@ -543,8 +543,13 @@ body.fit #player-boards .player-card-sidebar{flex-direction:row;justify-content:
 body.fit #player-boards .stat-row{flex-wrap:wrap;justify-content:center}
 body.fit .deck-area{display:none!important}
 
-/* Once a multiplayer game has started, the lobby/setup controls are done with. */
-body.mp-live .setup-row{display:none!important}
+/* ---- small board tokens tucked into corners so they don't cover the art ---- */
+body.fit .tile-players{align-items:flex-start;justify-content:flex-start;padding:6% 0 0 6%;gap:3%}
+body.fit .player-token{width:15%;max-width:26px}
+body.fit .player-token .assist-badge{min-width:11px;height:11px;padding:0 2px;font-size:7px;line-height:11px;right:-10%;bottom:-10%;box-shadow:0 0 0 1.5px #fff3d5}
+body.fit .tile-assistants{left:3%;right:3%;bottom:2%;gap:3%;justify-content:flex-end}
+body.fit .assistant-marker,body.fit .family-marker{width:11%;max-width:16px}
+body.fit .family-marker .family-badge{width:9px;height:9px;font-size:6px;line-height:9px}
 
 /* Fit-mode: scale tile-attached card stacks down with the board so they
    stay inside their tiles.  --fit-k is set on #decks by board.js. */

@@ -2186,7 +2186,9 @@ function renderTurnStatus(){
     actionBtn.disabled=true;endTurnBtn.disabled=true;actionBtn.style.display='none';return;
   }
   if(!p){turnStatus.textContent='Setting up…';return}
-  turnStatus.textContent=`${p.name}'s turn — ${p.pos}${gameOver==='round'?' (final round)':''}`;
+  const isMine=window.NET&&NET.role!=='solo'&&p.color===NET.myColor;
+  const who=isMine?'Your turn':`${p.name}'s turn`;
+  turnStatus.textContent=`${who} — ${p.pos}${gameOver==='round'?' (final round)':''}`;
   const canShowAction=awaitingAction&&!actionInitiated&&!pendingDice;
   actionBtn.style.display=canShowAction?'inline-block':'none';
   if(awaitingAction){
@@ -2207,7 +2209,8 @@ function announceTurn(force){
   if(!el||!p||gameOver===true)return;
   if(!force && announceTurn._last===p.id)return;
   announceTurn._last=p.id;
-  el.textContent=`${p.name} — your turn to move`;
+  const isMine=window.NET&&NET.role!=='solo'&&p.color===NET.myColor;
+  el.textContent=isMine?'Your turn to move' : `${p.name}'s turn to move`;
   el.hidden=false;
   requestAnimationFrame(()=>el.classList.add('show'));
   clearTimeout(announceTurn._t);
@@ -2487,10 +2490,22 @@ function mpApplySnapshot(s){
   try{ renderSultanPalaceCubes(); }catch(_){}
   try{ renderGemClaims(); }catch(_){}
   renderDecks();
-  requestAnimationFrame(()=>{ try{ placeAttachments(); applyFitScale(); }catch(_){} });
+  // do it synchronously (background tabs throttle rAF), then once more next frame
+  try{ applyFitScale(); placeAttachments(); }catch(_){}
+  requestAnimationFrame(()=>{ try{ applyFitScale(); placeAttachments(); }catch(_){} });
 
   const panel=document.getElementById('game-panel');
   if(panel && s.panelHTML!=null) panel.innerHTML=s.panelHTML;
+
+  // The panel HTML was rendered by the host — re-localise "whose turn" for this viewer.
+  (function(){
+    const ap=activePlayer(); if(!ap) return;
+    const mine=ap.color===MP.myColor;
+    const ts=document.getElementById('turn-status');
+    if(ts) ts.textContent=`${mine?'Your turn':ap.name+"’s turn"} — ${ap.pos}${gameOver==='round'?' (final round)':''}`;
+    const th=document.getElementById('turn-hint');
+    if(th && !mine) th.textContent=`Waiting for ${ap.name} to take their turn…`;
+  })();
 
   const my=MP.myColor;
   const mineHtml=(s.wheelbarrows && s.wheelbarrows[my])
@@ -2502,18 +2517,24 @@ function mpApplySnapshot(s){
   if(s.modalHTML) document.body.insertAdjacentHTML('beforeend', s.modalHTML);
 
   mpSetTurnGate();
-  mpToast(s.toast);
+  mpToastForTurn();
 }
 
 function mpToast(text){
   const el=document.getElementById('turn-toast');
   if(!el||!text) return;
-  if(mpToast._last===text) return;
-  mpToast._last=text;
   el.textContent=text; el.hidden=false;
   requestAnimationFrame(()=>el.classList.add('show'));
   clearTimeout(mpToast._t);
   mpToast._t=setTimeout(()=>el.classList.remove('show'), 2400);
+}
+// Locally-worded turn banner — only pops when the active merchant actually changes.
+function mpToastForTurn(){
+  const ap=activePlayer(); if(!ap||gameOver===true) return;
+  if(mpToastForTurn._last===ap.id) return;
+  mpToastForTurn._last=ap.id;
+  const mine=MP && ap.color===MP.myColor;
+  mpToast(mine?'Your turn to move':`${ap.name}’s turn to move`);
 }
 
 // Grey out every action control unless it is the local player's turn.
@@ -2585,6 +2606,9 @@ if(MP){
     if(MP.role==='host'){
       MP.hostStarted=true;
       newGame(Math.max(1, roster.length), {layout: gameSeed});
+      // use each player's lobby name in place of "Red Merchant" etc.
+      roster.forEach((r,i)=>{ if(players[i] && r.name) players[i].name=r.name; });
+      persistPlayerState();
       // newGame's final render() defers token placement to a rAF; do it now so the
       // first broadcast carries a fully-drawn board even in a background tab.
       placePlayers(); updateReachable(); renderSultanPalaceCubes(); renderAll();
