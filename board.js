@@ -2336,6 +2336,7 @@ function newGame(count,opts={}){
   if(typeof wantLayout==='number'){ gameSeed=wantLayout>>>0; }
   else if(wantLayout==='random'){ gameSeed=(Math.random()*4294967296)>>>0; }
   localStorage.setItem('istanbul-game-seed',String(gameSeed));
+  localStorage.setItem('istanbul-game-count',String(count));
   localStorage.removeItem('istanbul-player-state');
   // Clear any half-finished turn state left over from the previous game.
   caravanChoice=null;caravanPendingCards=[];caravanOffer=[];marketQuantities={fabric:0,spice:0,fruit:0,heirloom:0};blackGoodChoice='fabric';pendingGoodChoice=null;pendingPalaceAny=false;
@@ -2354,7 +2355,8 @@ function newGame(count,opts={}){
   renderAll();render({randomize:doRandom,seed:gameSeed});renderDecks();setLocked(true);refreshGameCodeUI();}
 
 ensureDiceOverlay();
-newGame(2,{layout:gameSeed});   // rebuild the last board from its seed so it matches the shown code
+{ const c=Math.min(4,Math.max(1,Number(localStorage.getItem('istanbul-game-count'))||2));
+  newGame(c,{layout:gameSeed}); }   // rebuild the last board (seed + player count) so it matches the shown code
 refreshGameCodeUI();
 renderSultanPalaceCubes();
 renderDecks();

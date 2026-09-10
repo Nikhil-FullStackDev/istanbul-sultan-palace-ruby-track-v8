@@ -32,7 +32,7 @@ tiles *and* the Mosque abilities — both fixed.
 | **Tea House / Black Market** | The **Red (Fabric) Mosque tile** die modification (turn a die to "4" or re-roll both, 1×) works at **both** Places, is triggered by owning the tile, and is reusable every visit. |
 | **Movement** | Landing on your own Assistant now **rejoins it to your stack** — no longer immediately re-dropped. Moving to a Place with no Assistant to leave (and none waiting) ends the turn with no action. |
 | **Wainwright** | Ruby for the 3rd wheelbarrow extension is **per-player**. |
-| **Player count** | Clamped to 1–4 (only 4 player-colour art assets exist). |
+| **Player count / setup** | Start a 2 / 3 / 4-player game from the buttons in the game panel. Each new game **shuffles the 16 Place tiles** and shows a **board code**; paste a friend's code + Join to get the identical board. |
 
 ## Dice modification (Tea House / Black Market) — Red (Fabric) Mosque tile
 
@@ -179,6 +179,21 @@ count after Lira; `resolveCore` keeps a now-dead `police` branch stub.
   players** buttons; the current count is highlighted. The game boots at 2 players.
   Picking a count starts a fresh game and renders **that many wheelbarrows**, all
   mirrored from player 1's layout.
+
+## Random boards + shareable code (build …u)
+
+- **The 16 Place tiles are shuffled** on every new game (seeded `mulberry32` RNG),
+  keeping the setup constraints (Fountain in a centre cell; Tea House & Black
+  Market ≥3 apart, different row *and* column). Tile art, attached card decks, and
+  the Palace / Gemstone / Post Office overlays all follow their Place by name.
+- **Board code** — a short base-36 token packs `{seed, playerCount}`. It's shown
+  in the setup row with a **Copy** button.
+- **Join** — paste a code + click **Join** (or press Enter) to rebuild the
+  **identical** board and player count (`makeGameCode` / `parseGameCode`). Play
+  stays local — everyone sets up the same board, then takes turns on their device.
+- Verified: two "4 players" clicks give different layouts; joining a saved code
+  reproduces its layout + seed exactly; invalid codes are rejected; 390 random
+  turns across freshly-shuffled 2/3/4-player boards with 0 errors, deck 26/26.
 
 ## Test status
 
