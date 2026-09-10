@@ -569,3 +569,59 @@ body.fit #decks .stack img{transform:scale(calc(var(--scale) * var(--fit-k,1)))}
   opacity:0;transform:translate(-50%,-14px);pointer-events:none;
   transition:opacity .3s ease,transform .3s ease}
 .turn-toast.show{opacity:1;transform:translate(-50%,0)}
+
+/* ================= Multiplayer lobby + turn gating ================= */
+#mp-lobby{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(circle at 50% 0,#2c4746,#0f1f1f);padding:20px;overflow:auto}
+#mp-lobby[hidden]{display:none}
+.mp-card{width:min(440px,94vw);background:linear-gradient(165deg,#241811,#160d08);
+  border:1px solid #966633;border-radius:18px;padding:26px 26px 22px;color:#f7e7bf;
+  box-shadow:0 24px 60px rgba(0,0,0,.55)}
+.mp-card h1{margin:0 0 4px;font:800 1.5rem/1.05 Georgia,serif;color:#fff3d5}
+.mp-card h1 em{color:#e6b449;font-style:italic}
+.mp-sub{margin:6px 0 14px;font:400 .82rem/1.45 system-ui,sans-serif;color:#cbb891}
+.mp-err{margin:0 0 12px;padding:8px 10px;border-radius:8px;background:rgba(198,68,59,.18);
+  border:1px solid #c6443b;color:#ffd9d2;font:600 .78rem system-ui,sans-serif}
+.mp-field{display:block;margin:0 0 12px;font:700 .74rem system-ui,sans-serif;color:#e6cf9a}
+.mp-field span{display:block;margin-bottom:4px}
+.mp-field input,.mp-row input,.mp-linkbox input{width:100%;border:1px solid #dca94f;border-radius:8px;
+  background:#2d1a0d;color:#fff1c6;padding:9px 11px;font:700 .85rem system-ui,sans-serif}
+.mp-row{display:flex;gap:8px;margin:0 0 10px}
+.mp-row input{flex:1}
+.mp-primary{width:100%;padding:11px 14px;border-radius:9px;background:#d3953b;color:#2d1a0d;
+  border:1px solid #ffe9b8;font:800 .9rem system-ui,sans-serif;cursor:pointer}
+.mp-primary:disabled{opacity:.5;cursor:not-allowed}
+.mp-or{text-align:center;margin:12px 0;color:#9c8a68;font:700 .7rem system-ui,sans-serif;
+  text-transform:uppercase;letter-spacing:.12em}
+.mp-link{background:none;border:0;color:#e1ac4d;text-decoration:underline;cursor:pointer;
+  font:600 .78rem system-ui,sans-serif;margin-top:10px;padding:4px}
+.mp-linkbox{display:flex;gap:6px;margin:4px 0 4px}
+.mp-linkbox input{flex:1;font:700 .74rem ui-monospace,monospace}
+.mp-linkbox button,.mp-row button{border:1px solid #f0c469;border-radius:8px;background:#2d1a0d;color:#ffe9b8;
+  padding:9px 12px;font:800 .78rem system-ui,sans-serif;cursor:pointer;white-space:nowrap}
+.mp-roster{list-style:none;margin:14px 0;padding:0;border:1px solid rgba(150,102,51,.5);border-radius:10px;overflow:hidden}
+.mp-roster li{display:flex;align-items:center;gap:9px;padding:9px 12px;border-bottom:1px solid rgba(150,102,51,.3)}
+.mp-roster li:last-child{border-bottom:0}
+.mp-dot{width:13px;height:13px;border-radius:50%;flex:none;box-shadow:0 0 0 2px rgba(255,255,255,.3)}
+.mp-pname{flex:1;font:700 .84rem system-ui,sans-serif;color:#fff3d5}
+.mp-pname em{color:#c9b48c;font-style:normal;font-weight:400}
+.mp-status{font:800 .66rem system-ui,sans-serif;text-transform:uppercase;letter-spacing:.06em;color:#b98d6a}
+.mp-status.is-ready{color:#7fe3c0}
+.mp-readytoggle{display:flex;align-items:center;gap:8px;font:800 .84rem system-ui,sans-serif;
+  color:#ffe9b8;padding:8px 0;cursor:pointer}
+.mp-readytoggle input{width:18px;height:18px}
+
+/* whose-turn gating — only the active player can act */
+body.mp-not-my-turn #do-action,
+body.mp-not-my-turn #end-turn,
+body.mp-not-my-turn .choice-modal-btn,
+body.mp-not-my-turn .good-pick,
+body.mp-not-my-turn [data-dice-mod],
+body.mp-not-my-turn .bonus-card-chip,
+body.mp-not-my-turn #roll-tea,
+body.mp-not-my-turn #roll-black,
+body.mp-not-my-turn #return-fountain,
+body.mp-not-my-turn .tile{pointer-events:none}
+body.mp-not-my-turn .choice-modal::after{content:'Waiting for the active player…';display:block;
+  margin-top:10px;font:700 .74rem system-ui,sans-serif;color:#c9b48c;text-align:center}
+body.mp-live #turn-toast{top:10px}

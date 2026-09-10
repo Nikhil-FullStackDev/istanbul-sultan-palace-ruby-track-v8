@@ -2102,8 +2102,14 @@ function renderPlayerBoards(){
   ensureSultanCubes();
   ensureThreePlayerBoardSlotLocks();
   const ap=activePlayer();
-  const shownPlayers=ap?players.filter(p=>p.id===ap.id):players;
-  boardsEl.innerHTML=shownPlayers.map(p=>{
+  // In multiplayer each viewer sees their own wheelbarrow; otherwise the active one.
+  const myColor=window.NET&&NET.role!=='solo'?NET.myColor:null;
+  const shownPlayers=myColor?players.filter(p=>p.color===myColor)
+    :(ap?players.filter(p=>p.id===ap.id):players);
+  boardsEl.innerHTML=(shownPlayers.length?shownPlayers:players.slice(0,1)).map(playerBoardCardHTML).join('');
+  bindPlayerBoardsInteractions();
+}
+function playerBoardCardHTML(p){
     const layers=playerBoardLayers[String(p.id)]||[];
     const cubeHtml=Object.values(sultanCubes).filter(c=>Number(c.playerId)===Number(p.id)).map(c=>{
       const cubeId=`${p.id}-${c.row+1}`;
@@ -2131,7 +2137,8 @@ function renderPlayerBoards(){
     // One "Hand" holding every kind of card the player owns (Bonus cards + Mosque tiles).
     const handHtml=(cardHand+mosqueHand)||'<span class="empty-card-slot">No cards</span>';
     return `<div class="player-board-card ${p.id===turn&&!gameOver?'is-current':''}"><h3><span class="dot" style="background:${cssColor(p.color)}"></span>${p.name}</h3><div class="player-board-stage"><span class="sultan-row-arrow-spacer" aria-hidden="true"></span><div class="cart-board-wrap"><img class="wheelbarrow-art" src="assets/player-pieces/cart-board.png" alt="${p.name} wheelbarrow" draggable="false"><div class="player-board-layers-layer">${layersHtml}</div><div class="player-board-slot-locks">${slotLocksHtml}</div><div class="sultan-cubes-layer">${cubes}</div><div class="cart-vertical-locks">${locks}</div></div>${renderCoinRack(p)}<div class="player-card-sidebar"><div class="bonus-hand-area"><span class="card-area-label">Hand</span><div class="bonus-card-row">${handHtml}</div></div><div class="discard-area"><span class="card-area-label">Discard</span><div class="discard-slot ${bonusDiscard.length?'has-cards':''}" data-player="${p.id}">${bonusDiscard.length?`<img src="${bonusImage(bonusDiscard[bonusDiscard.length-1])}" alt="Top discard: ${bonusName(bonusDiscard[bonusDiscard.length-1])}"><span>x${bonusDiscard.length}</span>`:'<span>Drop card here</span>'}</div></div></div><span class="sultan-row-arrow-spacer" aria-hidden="true"></span></div><div class="stat-row"><span class="stat-chip">${p.coins} Lira</span><span class="stat-chip rubies">${p.rubies}/${winnerTarget} Rubies</span><span class="stat-chip">${goodsTotal(p)}/${cartCapacity(p)} goods</span><span class="stat-chip">${(p.bonusHand?.length||0)+(p.mosqueCardHand?.length||0)} cards</span></div><div class="stat-row">${GOODS.map(g=>`<span class="stat-chip">${GOOD_LABEL[g]} ${p.goods[g]||0}</span>`).join('')}</div></div>`;
-  }).join('');
+}
+function bindPlayerBoardsInteractions(){
   boardsEl.querySelectorAll('[data-sultan-cube]').forEach(b=>b.oncontextmenu=e=>e.preventDefault());
   boardsEl.querySelectorAll('[data-discard-card]').forEach(b=>{
     b.onclick=async()=>{
@@ -2382,6 +2389,8 @@ function newGame(count,opts={}){
 ensureDiceOverlay();
 // Start solo: only the host merchant is on the board. Others appear one at a
 // time via "Join" (addPlayer), each new merchant token showing as it joins.
+// (In a multiplayer lobby this board just sits behind the lobby overlay until
+// the host presses Start / the first snapshot arrives.)
 newGame(1,{layout:gameSeed});
 
 function addPlayer(){
@@ -2421,3 +2430,168 @@ requestAnimationFrame(relayoutFit);
 window.addEventListener('load',relayoutFit);
 let _resizeT=0;
 window.addEventListener('resize',()=>{ clearTimeout(_resizeT); _resizeT=setTimeout(relayoutFit,120); });
+
+/* ===================================================================
+   MULTIPLAYER  —  host-authority.  The room creator's tab runs the real
+   game and broadcasts a snapshot after every render; guests display it
+   and forward their clicks, which the host replays on its own DOM.
+   =================================================================== */
+const MP = window.NET || null;
+
+function mpSnapshot(){
+  const panel=document.getElementById('game-panel');
+  return {
+    turn, gameOver, awaitingAction, actionInitiated, winnerTarget,
+    layout: currentLayout.slice(),
+    players: players.map(p=>({
+      id:p.id, color:p.color, name:p.name,
+      pos:(p._realPos||p.pos), hiddenPos:p._realPos?p.pos:null,
+      assistants:p.assistants, left:(p.left||[]).slice(), familyPos:p.familyPos,
+      coins:p.coins, rubies:p.rubies, goods:{...p.goods}, cartUnlocked:(p.cartUnlocked||[]).slice(),
+      bonusHand:(p.bonusHand||[]).slice(), mosqueCardHand:(p.mosqueCardHand||[]).slice(),
+      yellowRecallUsed:!!p.yellowRecallUsed, greenBonusUsed:!!p.greenBonusUsed,
+      redMosqueUsed:!!p.redMosqueUsed, wainwrightRubyTaken:!!p.wainwrightRubyTaken,
+      mosqueTiles:(p.mosqueTiles||[]).slice(),
+    })),
+    sultanCubes: JSON.parse(JSON.stringify(sultanCubes||{})),
+    gemClaims: gemstoneLayers.filter(l=>l&&l.claimed).map(l=>l.id),
+    palaceRubyIndex, gemstoneRubyIndex,
+    panelHTML: panel ? panel.innerHTML : '',
+    wheelbarrows: Object.fromEntries(players.map(p=>[p.color, playerBoardCardHTML(p)])),
+    modalHTML: document.getElementById('choice-modal-backdrop')?.outerHTML || null,
+    toast: document.getElementById('turn-toast')?.textContent || '',
+  };
+}
+
+function mpApplySnapshot(s){
+  players = s.players.map(pp=>({
+    ...pp,
+    pos: pp.hiddenPos || pp.pos,
+    _realPos: pp.hiddenPos ? pp.pos : undefined,
+    left: pp.left || [],
+    goods: pp.goods || {fabric:0,spice:0,fruit:0,heirloom:0},
+    bonusHand: pp.bonusHand || [], mosqueCardHand: pp.mosqueCardHand || [],
+    cartUnlocked: pp.cartUnlocked || [false,false,false],
+    bonusCards:(pp.bonusHand||[]).length,
+  }));
+  turn=s.turn; gameOver=s.gameOver; awaitingAction=s.awaitingAction;
+  actionInitiated=s.actionInitiated; winnerTarget=s.winnerTarget;
+  if(Array.isArray(s.layout)&&s.layout.length===locations.length) currentLayout=s.layout.slice();
+  sultanCubes=s.sultanCubes||{};
+  palaceRubyIndex=s.palaceRubyIndex; gemstoneRubyIndex=s.gemstoneRubyIndex;
+  const claimed=new Set(s.gemClaims||[]);
+  gemstoneLayers.forEach(l=>{ if(l){ if(claimed.has(l.id)) l.claimed=true; else delete l.claimed; } });
+
+  render();                       // rebuild the 16 tiles from currentLayout
+  placePlayers(); updateReachable();
+  try{ renderSultanPalaceCubes(); }catch(_){}
+  try{ renderGemClaims(); }catch(_){}
+  renderDecks();
+  requestAnimationFrame(()=>{ try{ placeAttachments(); applyFitScale(); }catch(_){} });
+
+  const panel=document.getElementById('game-panel');
+  if(panel && s.panelHTML!=null) panel.innerHTML=s.panelHTML;
+
+  const my=MP.myColor;
+  const mine=players.find(p=>p.color===my)||activePlayer()||players[0];
+  if(mine){ boardsEl.innerHTML=playerBoardCardHTML(mine); bindPlayerBoardsInteractions(); }
+
+  document.getElementById('choice-modal-backdrop')?.remove();
+  if(s.modalHTML) document.body.insertAdjacentHTML('beforeend', s.modalHTML);
+
+  mpSetTurnGate();
+  mpToast(s.toast);
+}
+
+function mpToast(text){
+  const el=document.getElementById('turn-toast');
+  if(!el||!text) return;
+  if(mpToast._last===text) return;
+  mpToast._last=text;
+  el.textContent=text; el.hidden=false;
+  requestAnimationFrame(()=>el.classList.add('show'));
+  clearTimeout(mpToast._t);
+  mpToast._t=setTimeout(()=>el.classList.remove('show'), 2400);
+}
+
+// Grey out every action control unless it is the local player's turn.
+function mpSetTurnGate(){
+  if(!MP || MP.role==='solo') return;
+  const mine = activePlayer() && activePlayer().color===MP.myColor;
+  document.body.classList.toggle('mp-not-my-turn', !mine && !gameOver);
+  document.body.classList.toggle('mp-my-turn', !!mine && !gameOver);
+}
+
+// ---- click describe / replay -------------------------------------
+function mpDescribeClick(target){
+  const t=target.closest?.('.tile[data-location],#do-action,#end-turn,#roll-tea,#roll-black,#return-fountain,.choice-modal-btn,.good-pick,[data-dice-mod],.bonus-card-chip[data-bonus-card]');
+  if(!t) return null;
+  if(t.dataset && t.dataset.location) return {kind:'tile', loc:t.dataset.location};
+  if(t.classList.contains('choice-modal-btn')) return {kind:'modal', i:t.dataset.i};
+  if(t.classList.contains('good-pick')) return {kind:'good', g:t.dataset.good||t.dataset.blackGood||''};
+  if(t.dataset && t.dataset.diceMod) return {kind:'dmod', v:t.dataset.diceMod};
+  if(t.dataset && t.dataset.bonusCard) return {kind:'card', id:t.dataset.bonusCard};
+  if(t.id) return {kind:'id', id:t.id};
+  return null;
+}
+function mpReplayClick(from, d){
+  const ap=activePlayer();
+  if(!ap || ap.color!==from) return;          // not that player's turn — ignore
+  let el=null;
+  const q=s=>document.querySelector(s);
+  if(d.kind==='tile') el=q(`.tile[data-location="${(window.CSS&&CSS.escape)?CSS.escape(d.loc):d.loc}"]`);
+  else if(d.kind==='id') el=document.getElementById(d.id);
+  else if(d.kind==='modal') el=q(`#choice-modal-backdrop .choice-modal-btn[data-i="${d.i}"]`);
+  else if(d.kind==='good') el=q(`.good-pick[data-good="${d.g}"]`)||q(`.good-pick[data-black-good="${d.g}"]`);
+  else if(d.kind==='dmod') el=q(`[data-dice-mod="${d.v}"]`);
+  else if(d.kind==='card') el=q(`.bonus-card-chip[data-bonus-card="${d.id}"]`);
+  else if(d.kind==='val'){ const i=document.getElementById(d.id); if(i) i.value=d.value; return; }
+  else if(d.kind==='fpick'){ const c=[...document.querySelectorAll('.fountain-pick')].find(x=>x.value===d.value); if(c) c.checked=d.checked; return; }
+  if(el) el.click();
+}
+
+if(MP){
+  // Callbacks/wrappers are installed now but each checks MP.role at call time —
+  // the lobby only decides host vs guest vs solo after the page has loaded.
+  // ---- guest: forward clicks, never run the game locally ----
+  document.addEventListener('click', e=>{
+    if(MP.role!=='guest') return;
+    if(e.target.closest?.('#mp-lobby,#wb-open-btn,.wb-modal-close,.wb-modal-backdrop,#copy-code,#mp-copy-link')) return;
+    const d=mpDescribeClick(e.target);
+    if(!d) return;
+    e.preventDefault(); e.stopPropagation();
+    MP.sendInput(d);                    // host validates it is this player's turn
+  }, true);
+  document.addEventListener('change', e=>{
+    if(MP.role!=='guest') return;
+    const el=e.target;
+    if(el.id==='tea-target') MP.sendInput({kind:'val', id:'tea-target', value:el.value});
+    else if(el.classList && el.classList.contains('fountain-pick')) MP.sendInput({kind:'fpick', value:el.value, checked:el.checked});
+  }, true);
+
+  MP.onState = s=>{ if(MP.role==='guest') mpApplySnapshot(s); };
+  MP.onInput = ({from, action})=>{ if(MP.role==='host'){ mpReplayClick(from, action); } };
+
+  // ---- host: broadcast after every render, once started ----
+  let _bcT=0;
+  MP.scheduleBroadcast = ()=>{ clearTimeout(_bcT); _bcT=setTimeout(()=>{ try{ MP.sendState(mpSnapshot()); }catch(_){} }, 60); };
+  const _renderAll=renderAll;
+  renderAll=function(){ _renderAll.apply(this, arguments); mpSetTurnGate(); if(MP.role==='host'&&MP.hostStarted) MP.scheduleBroadcast(); };
+
+  MP.onStart = roster=>{
+    document.getElementById('mp-lobby')?.setAttribute('hidden','');
+    if(MP.role==='host'){
+      MP.hostStarted=true;
+      newGame(Math.max(1, roster.length), {layout: gameSeed});
+      // newGame's final render() defers token placement to a rAF; do it now so the
+      // first broadcast carries a fully-drawn board even in a background tab.
+      placePlayers(); updateReachable(); renderSultanPalaceCubes(); renderAll();
+      announceTurn(true);
+      MP.scheduleBroadcast();
+    } else {
+      // guest waits for the first snapshot
+      mpSetTurnGate();
+    }
+  };
+  MP.onHostLeft = ()=>{ mpToast('Host left — game paused'); };
+}

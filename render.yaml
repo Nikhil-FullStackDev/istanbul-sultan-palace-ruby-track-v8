@@ -1,7 +1,9 @@
 services:
   - type: web
     name: istanbul-sultan-palace-ruby-track
-    runtime: static
-    buildCommand: ""
-    staticPublishPath: .
-    pullRequestPreviewsEnabled: false
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node server.js
+    healthCheckPath: /
+    autoDeploy: true

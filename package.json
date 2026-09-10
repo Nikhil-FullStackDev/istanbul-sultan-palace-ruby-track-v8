@@ -1,0 +1,10 @@
+{
+  "name": "istanbul-sultan-palace-ruby-track",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Istanbul board layout tool + tiny multiplayer relay",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "start": "node server.js"
+  }
+}
