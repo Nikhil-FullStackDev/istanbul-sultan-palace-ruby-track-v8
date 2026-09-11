@@ -266,12 +266,12 @@
    dashed outlines, index numbers, control buttons, add-layer buttons -- so the
    board art, cards and game tokens read cleanly. Kept visible: merchants,
    family members, assistants, posted-mail cubes, palace requirement markers,
-   the Gemstone Dealer ruby track, and the wheelbarrow (player-board) slot
-   locks -- just their outlines/numbers/handles are stripped. */
+   the Gemstone Dealer ruby track, the wheelbarrow (player-board) slot locks,
+   and any Ruby you've actually earned on your wheelbarrow's Ruby row --
+   just their outlines/numbers/handles are stripped. */
 .hide-editing-controls .palace-layer-host,
 .hide-editing-controls .post-office-layer-host,
 .hide-editing-controls .post-office-add-layer,
-.hide-editing-controls .player-board-layers-layer,
 .hide-editing-controls .palace-layer-controls,
 .hide-editing-controls .post-office-layer-controls,
 .hide-editing-controls .gemstone-layer-controls,
@@ -283,6 +283,11 @@
 .hide-editing-controls .gem-ruby-number,
 .hide-editing-controls .layer-label,
 .hide-editing-controls .layer-index{display:none!important}
+/* Wheelbarrow layer grid: hide the editable custom/sultan-cube slots, but the
+   Ruby-row layers (.ruby-layer, shown only once a Ruby is actually claimed)
+   must stay -- they're the only place an earned Ruby is drawn. */
+.hide-editing-controls .player-board-layers-layer .player-board-layer:not(.ruby-layer){display:none!important}
+.hide-editing-controls .player-board-layer.ruby-layer{border-color:transparent!important;background:transparent!important;box-shadow:none!important;cursor:default!important;pointer-events:none!important}
 /* Gemstone ruby track: keep the rubies, drop the boxes/outlines. */
 .hide-editing-controls .gemstone-board-layer{border-color:transparent!important;background:transparent!important;box-shadow:none!important;cursor:default!important;pointer-events:none!important}
 /* The dashed per-tile placement slot is editing scaffolding — hide its box entirely. */
