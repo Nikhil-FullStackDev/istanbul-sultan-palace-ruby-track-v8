@@ -1,5 +1,10 @@
 :root{color:#2a1b11;background:#172a2a;font-family:Georgia,'Times New Roman',serif}*{box-sizing:border-box}body{min-width:320px;margin:0;background:radial-gradient(circle at 50% 0,#426261 0,#172a2a 58rem)}main{max-width:1280px;margin:0 auto;padding:32px 22px 44px}header{color:#fff3d5;max-width:860px;margin-bottom:20px}.eyebrow{margin:0 0 7px;color:#e1ac4d;font:700 .7rem/1 system-ui,sans-serif;letter-spacing:.16em;text-transform:uppercase}h1{margin:0;font-size:clamp(2.8rem,7vw,5.8rem);line-height:.87;letter-spacing:-.06em}h1 em{color:#e6b449;font-weight:400}.intro{margin:13px 0 0;max-width:760px;color:#d5e0d8;font:1rem/1.45 system-ui,sans-serif}.controls{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}button{border:1px solid #f0c469;border-radius:7px;background:#d3953b;color:#2d1a0d;padding:9px 12px;font:700 .78rem system-ui,sans-serif}button.active{background:#fff1c6}.play-surface{position:relative}.table{padding:clamp(12px,3vw,32px);border:1px solid #9b6936;border-radius:26px;background:linear-gradient(135deg,#6b3e20,#b47735 50%,#5b351f);box-shadow:0 18px 0 #0c1919,inset 0 0 0 9px rgba(49,24,12,.5),inset 0 0 50px rgba(23,9,4,.72)}.board-frame{padding:clamp(7px,1.5vw,15px);border:3px solid #e1b06d;border-radius:14px;background:#28170f;box-shadow:inset 0 0 0 4px #6f4022}.board{display:grid;grid-template-columns:repeat(4,1fr);gap:clamp(5px,1vw,12px)}.tile{aspect-ratio:1.20;overflow:hidden;border-radius:7px;border:2px solid #e4bb79;background-image:var(--art);background-size:200% 200%;background-position:var(--x) var(--y);box-shadow:0 3px 6px #120907,inset 0 0 0 1px rgba(24,8,0,.7)}.deck-area{position:relative;margin-top:28px;padding:18px;border:1px solid #966633;border-radius:18px;background:rgba(26,17,12,.73)}.deck-note{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;color:#f7e7bf}.deck-note strong{font-size:1.2rem}.deck-note span{color:#d4c2a1;font:0.78rem/1.35 system-ui,sans-serif}.decks{position:absolute;inset:0;z-index:5;pointer-events:none}.deck{position:absolute;left:var(--deck-x);top:var(--deck-y);width:calc(var(--card-w) * var(--scale));pointer-events:auto;touch-action:none;z-index:1}.decks[data-locked="false"] .deck{cursor:grab}.decks[data-locked="false"] .deck:active{cursor:grabbing}.deck.dragging{opacity:.8;z-index:20}.stack{position:relative;width:calc(var(--card-w) * var(--scale));height:calc(var(--card-h) * var(--scale) + 8px)}.stack img{position:absolute;top:0;left:0;width:var(--card-w);height:auto;transform:scale(var(--scale));transform-origin:top left;border:2px solid #ecd08e;border-radius:8px;background:#d6b36a;box-shadow:3px 4px 0 #160b06}.stack.face-down img{filter:brightness(.27) sepia(.5);background:#5a341b}.token .stack img{border:0;border-radius:0;box-shadow:none}.deck-caption{display:none;margin-top:9px;color:#fff1d0;font:700 .78rem/1.2 system-ui,sans-serif;text-shadow:0 1px 2px #180b05}.show-captions .deck-caption{display:block}.resize-controls{display:flex;gap:5px;margin-top:7px}.resize-controls button{padding:2px 8px;font-size:1rem;line-height:1}.decks[data-locked="true"] .resize-controls{display:none}@media(max-width:670px){main{padding:22px 10px}.table{padding:10px}.board{gap:4px}.deck{max-width:90vw}}
 
+.turn-badge{--turn-color:#999;display:inline-flex;align-items:center;gap:7px;padding:5px 12px;border-radius:999px;background:rgba(0,0,0,.32);border:1px solid var(--turn-color);color:#fff3d5;font:800 .8rem system-ui,sans-serif;white-space:nowrap}
+.turn-badge::before{content:'';width:9px;height:9px;border-radius:50%;background:var(--turn-color);box-shadow:0 0 0 2px rgba(255,255,255,.25)}
+.turn-badge.is-mine{background:rgba(127,227,192,.16);border-color:#7fe3c0}
+.turn-badge.is-over::before{display:none}
+
 /* --- Player pieces & game panel (added) --- */
 .tile-players{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:5%;pointer-events:none;z-index:6}
 .tile-assistants{position:absolute;left:4%;right:4%;bottom:4%;display:flex;justify-content:center;gap:6%;pointer-events:none;z-index:6}
@@ -59,7 +64,10 @@
 .card-row.is-info .card-row-text{opacity:.85}
 .card-row-choices{display:flex;gap:6px;flex-wrap:wrap}
 .card-row-choices button{border:1px solid #f0c469;border-radius:7px;background:#d3953b;color:#2d1a0d;padding:5px 10px;font:700 .72rem system-ui,sans-serif}
-.game-log{margin:0;padding-left:18px;display:grid;gap:5px;font:.8rem/1.35 system-ui,sans-serif;color:#e7d9bb;max-height:132px;overflow:auto}
+.mosque-icon-row{gap:10px}
+.mosque-icon-row img{width:40px;height:auto;border-radius:5px;flex:0 0 auto;box-shadow:2px 3px 0 rgba(0,0,0,.35);cursor:help}
+.mosque-icon-row.is-disabled img{opacity:.55}
+.mosque-icon-row .card-row-choices{flex:1}
 .player-boards{display:flex;gap:16px;flex-wrap:wrap}
 .player-board-card{width:fit-content;max-width:100%;padding:0;border-radius:0;background:transparent;border:0}
 .player-board-card.is-current{box-shadow:none}
@@ -548,21 +556,28 @@ body.fit #game-panel{flex:0 0 auto;max-height:min(48%,340px);margin:0;
 /* Game setup (player count, board code, join) lives in the lobby now — never in-game. */
 body.fit .setup-row,body.fit .setup-hint{display:none!important}
 body.fit .turn-row{gap:6px}
-body.fit .turn-status{font-size:.95rem}
+body.fit #turn-status{display:none}
 body.fit .turn-hint{font-size:.74rem}
-body.fit #game-log{flex:1;min-height:40px;overflow-y:auto;margin:0}
-body.fit #player-boards{flex:1 1 auto;min-height:0;overflow:auto;
+body.fit #player-boards{flex:1 1 auto;min-height:0;overflow:hidden;
   padding:8px 10px;border:1px solid #966633;border-radius:14px;background:rgba(26,17,12,.76);
-  display:flex;justify-content:center}
-body.fit #player-boards .player-board-card{width:100%;max-width:520px}
-/* Compact vertical wheelbarrow so it fits the rail without sideways scrolling. */
-body.fit #player-boards .player-board-stage{display:flex;flex-direction:column;align-items:stretch;
-  width:100%;max-width:100%;gap:8px}
-body.fit #player-boards .player-board-stage>*{width:100%;min-width:0}
+  display:flex;justify-content:center;align-items:stretch}
+body.fit #player-boards .player-board-card{width:100%;max-width:100%;height:100%;
+  display:flex;flex-direction:column;min-height:0}
+body.fit #player-boards .player-board-card h3{flex:0 0 auto}
+/* Wheelbarrow art + coins (vertical) + hand/discard, all in one row beside
+   each other, sized to the available HEIGHT so it fills the rail without
+   ever needing to scroll. */
+body.fit #player-boards .player-board-stage{display:flex;flex-direction:row;align-items:stretch;
+  justify-content:center;width:100%;max-width:100%;flex:1 1 auto;min-height:0;gap:12px;flex-wrap:nowrap}
+body.fit #player-boards .cart-board-wrap{flex:0 0 auto;height:100%;width:auto;max-width:70%}
+body.fit #player-boards .wheelbarrow-art{width:auto;height:100%;max-width:100%;display:block}
 body.fit #player-boards .sultan-row-arrow-spacer{display:none}
-body.fit #player-boards .player-coin-rack{flex-direction:row;justify-content:center;flex-wrap:wrap;gap:8px}
-body.fit #player-boards .player-card-sidebar{flex-direction:row;justify-content:space-around;gap:10px}
-body.fit #player-boards .stat-row{flex-wrap:wrap;justify-content:center}
+body.fit #player-boards .player-coin-rack{flex:0 0 auto;flex-direction:column;justify-content:center;gap:10px;align-self:center}
+body.fit #player-boards .player-card-sidebar{flex:0 0 auto;flex-direction:column;justify-content:center;gap:12px;width:auto;align-self:center}
+body.fit #player-boards .bonus-card-row{flex-direction:row;flex-wrap:wrap;min-height:0}
+body.fit #player-boards .bonus-card-chip img,body.fit #player-boards .mosque-card-chip img{width:48px}
+body.fit #player-boards .discard-slot{min-width:48px;min-height:66px}
+body.fit #player-boards .discard-slot img{width:44px}
 body.fit .deck-area{display:none!important}
 
 /* ---- small board tokens tucked into corners so they don't cover the art ---- */

@@ -2138,7 +2138,7 @@ function playerBoardCardHTML(p){
     const mosqueHand=(p.mosqueCardHand||[]).map((id,i)=>{const c=parseMosqueCardId(id);return `<div class="mosque-card-chip" title="${c.mosque} Mosque tile — ${GOOD_LABEL[c.color]} (${MOSQUE_ABILITY[c.color]} ability)"><img src="${mosqueCardImage(c.mosque,c.color,c.req)}" alt="${c.mosque} ${GOOD_LABEL[c.color]} Mosque tile"><span>M</span></div>`}).join('');
     // One "Hand" holding every kind of card the player owns (Bonus cards + Mosque tiles).
     const handHtml=(cardHand+mosqueHand)||'<span class="empty-card-slot">No cards</span>';
-    return `<div class="player-board-card ${p.id===turn&&!gameOver?'is-current':''}"><h3><span class="dot" style="background:${cssColor(p.color)}"></span>${p.name}</h3><div class="player-board-stage"><span class="sultan-row-arrow-spacer" aria-hidden="true"></span><div class="cart-board-wrap"><img class="wheelbarrow-art" src="assets/player-pieces/cart-board.png" alt="${p.name} wheelbarrow" draggable="false"><div class="player-board-layers-layer">${layersHtml}</div><div class="player-board-slot-locks">${slotLocksHtml}</div><div class="sultan-cubes-layer">${cubes}</div><div class="cart-vertical-locks">${locks}</div></div>${renderCoinRack(p)}<div class="player-card-sidebar"><div class="bonus-hand-area"><span class="card-area-label">Hand</span><div class="bonus-card-row">${handHtml}</div></div><div class="discard-area"><span class="card-area-label">Discard</span><div class="discard-slot ${bonusDiscard.length?'has-cards':''}" data-player="${p.id}">${bonusDiscard.length?`<img src="${bonusImage(bonusDiscard[bonusDiscard.length-1])}" alt="Top discard: ${bonusName(bonusDiscard[bonusDiscard.length-1])}"><span>x${bonusDiscard.length}</span>`:'<span>Drop card here</span>'}</div></div></div><span class="sultan-row-arrow-spacer" aria-hidden="true"></span></div><div class="stat-row"><span class="stat-chip">${p.coins} Lira</span><span class="stat-chip rubies">${p.rubies}/${winnerTarget} Rubies</span><span class="stat-chip">${goodsTotal(p)}/${cartCapacity(p)} goods</span><span class="stat-chip">${(p.bonusHand?.length||0)+(p.mosqueCardHand?.length||0)} cards</span></div><div class="stat-row">${GOODS.map(g=>`<span class="stat-chip">${GOOD_LABEL[g]} ${p.goods[g]||0}</span>`).join('')}</div></div>`;
+    return `<div class="player-board-card ${p.id===turn&&!gameOver?'is-current':''}"><h3><span class="dot" style="background:${cssColor(p.color)}"></span>${p.name}</h3><div class="player-board-stage"><span class="sultan-row-arrow-spacer" aria-hidden="true"></span><div class="cart-board-wrap"><img class="wheelbarrow-art" src="assets/player-pieces/cart-board.png" alt="${p.name} wheelbarrow" draggable="false"><div class="player-board-layers-layer">${layersHtml}</div><div class="player-board-slot-locks">${slotLocksHtml}</div><div class="sultan-cubes-layer">${cubes}</div><div class="cart-vertical-locks">${locks}</div></div>${renderCoinRack(p)}<div class="player-card-sidebar"><div class="bonus-hand-area"><span class="card-area-label">Hand</span><div class="bonus-card-row">${handHtml}</div></div><div class="discard-area"><span class="card-area-label">Discard</span><div class="discard-slot ${bonusDiscard.length?'has-cards':''}" data-player="${p.id}">${bonusDiscard.length?`<img src="${bonusImage(bonusDiscard[bonusDiscard.length-1])}" alt="Top discard: ${bonusName(bonusDiscard[bonusDiscard.length-1])}"><span>x${bonusDiscard.length}</span>`:'<span>Drop card here</span>'}</div></div></div><span class="sultan-row-arrow-spacer" aria-hidden="true"></span></div></div>`;
 }
 function bindPlayerBoardsInteractions(){
   boardsEl.querySelectorAll('[data-sultan-cube]').forEach(b=>b.oncontextmenu=e=>e.preventDefault());
@@ -2181,26 +2181,38 @@ function renderCardSupply(){
   if(slot)slot.innerHTML=bonusDiscard.length?`<img src="${bonusImage(bonusDiscard[bonusDiscard.length-1])}" alt="Top discard: ${bonusName(bonusDiscard[bonusDiscard.length-1])}"><span>Discard pile · ${bonusDiscard.length}</span>`:'<span>Discard pile · 0</span>';
 }
 
+function renderTurnBadge(text,opts={}){
+  const badge=document.getElementById('turn-badge');
+  if(!badge)return;
+  if(!text){badge.hidden=true;return}
+  badge.hidden=false;badge.textContent=text;
+  badge.style.setProperty('--turn-color',opts.color||'#999');
+  badge.classList.toggle('is-mine',!!opts.mine);
+  badge.classList.toggle('is-over',!!opts.over);
+}
 function renderTurnStatus(){
   const p=activePlayer();
   if(gameOver===true){
     turnStatus.textContent='Game complete';turnHint.textContent=`${finalWinner()?.name||''} wins.`;
-    actionBtn.disabled=true;endTurnBtn.disabled=true;actionBtn.style.display='none';return;
+    actionBtn.disabled=true;endTurnBtn.disabled=true;actionBtn.style.display='none';
+    renderTurnBadge(`🏆 ${finalWinner()?.name||''} wins`,{over:true});
+    return;
   }
-  if(!p){turnStatus.textContent='Setting up…';return}
+  if(!p){turnStatus.textContent='Setting up…';renderTurnBadge('');return}
   const isMine=window.NET&&NET.role!=='solo'&&p.color===NET.myColor;
   const who=isMine?'Your turn':`${p.name}'s turn`;
   turnStatus.textContent=`${who} — ${p.pos}${gameOver==='round'?' (final round)':''}`;
+  renderTurnBadge(`${who}${gameOver==='round'?' · final round':''}`,{color:cssColor(p.color),mine:isMine});
   const canShowAction=awaitingAction&&!actionInitiated&&!pendingDice;
   actionBtn.style.display=canShowAction?'inline-block':'none';
   if(awaitingAction){
     const caravanBusy=caravanChoice==='pick';
     turnHint.textContent=caravanBusy?'Caravansary: keep 1 of the revealed cards (the rest are discarded).':familyPlacementMode?'Click a highlighted tile to send your Family Member there.':pendingGoodChoice?`${pendingGoodChoice.title} — pick a good below.`:familyActionMode?`Family Member at ${familyActionTarget}: carry out that Place's action.`:`${p.pos}: ${actionInfo[p.pos]?.label||''}`;
     actionBtn.disabled=caravanBusy||!!pendingGoodChoice;
-    actionBtn.textContent=caravanBusy?'Caravansary…':familyActionMode?'Resolve Family action':(p.pos==='Tea House'&&!pendingDice?'Roll Dice':`Do action at ${p.pos}`);
+    actionBtn.textContent='Action';
   }else{
     turnHint.textContent=`${p.name}: click a place 1–2 orthogonal steps from ${p.pos} to move.`;
-    actionBtn.disabled=true;actionBtn.textContent='Move to a tile first';
+    actionBtn.disabled=true;actionBtn.textContent='Action';
   }
   endTurnBtn.disabled=!awaitingAction;
   // A mosque-card good picker (e.g. the Spice tile's "+1 good") resolves and
@@ -2251,7 +2263,7 @@ function renderCardsPanel(p){
   const greenReady=mosqueColors.includes('green')&&!p.greenBonusUsed&&p.coins>=2&&awaitingAction&&actionInfo[p.pos]?.type==='warehouse';
   const yellowReady=mosqueColors.includes('yellow')&&!p.yellowRecallUsed&&p.coins>=2&&p.left.length>0;
   const readyCount=playable.length+(greenReady?1:0)+(yellowReady?1:0);
-  btn.textContent=`Use Bonus/Mosque card${readyCount?` (${readyCount})`:''}`;
+  btn.textContent='Use card';
   btn.classList.toggle('has-ready',readyCount>0);
   panel.hidden=!cardsPanelOpen;
   if(!cardsPanelOpen)return;
@@ -2272,26 +2284,31 @@ function renderCardsPanel(p){
       +`<button type="button" data-play-bonus="${readyId||''}" ${usable?'':'disabled'}>Play</button></div>`;
   }).join('');
 
+  // Mosque abilities: just the tile's own card art, hover for what it does —
+  // no permanent block of descriptive text taking up panel space.
   const mosqueRows=mosqueColors.map(color=>{
     const info=MOSQUE_ABILITY_INFO[color];
-    if(color==='red')return `<div class="card-row is-info"><div class="card-row-text"><strong>${info.title}</strong><span class="card-reason">${info.desc}</span></div></div>`;
+    const cardId=(p.mosqueCardHand||[]).find(id=>MOSQUE_ABILITY[parseMosqueCardId(id).color]===color);
+    const c=cardId?parseMosqueCardId(cardId):null;
+    const img=c?mosqueCardImage(c.mosque,c.color,c.req):'';
+    if(color==='red')return `<div class="card-row mosque-icon-row is-info"><img src="${img}" alt="${info.title}" title="${info.title} — ${info.desc}"></div>`;
     if(color==='green'){
       let reason=info.desc;
       if(p.greenBonusUsed)reason='Already used this turn';
       else if(p.coins<2)reason='Need 2 Lira';
       else if(!(awaitingAction&&actionInfo[p.pos]?.type==='warehouse'))reason='Only while carrying out a Warehouse action';
-      return `<div class="card-row ${greenReady?'':'is-disabled'}"><div class="card-row-text"><strong>${info.title}</strong><span class="card-reason">${reason}</span></div><button type="button" id="green-bonus" ${greenReady?'':'disabled'}>Use</button></div>`;
+      return `<div class="card-row mosque-icon-row ${greenReady?'':'is-disabled'}"><img src="${img}" alt="${info.title}" title="${info.title} — ${reason}"><button type="button" id="green-bonus" ${greenReady?'':'disabled'}>Use</button></div>`;
     }
     if(color==='yellow'){
       if(yellowReady){
-        return `<div class="card-row"><div class="card-row-text"><strong>${info.title}</strong><span class="card-reason">Pick which Assistant to bring back:</span></div>`
+        return `<div class="card-row mosque-icon-row"><img src="${img}" alt="${info.title}" title="${info.title} — pick an Assistant to recall">`
           +`<div class="card-row-choices">${p.left.map((place,i)=>`<button type="button" data-yellow-recall-panel="${i}">${place}</button>`).join('')}</div></div>`;
       }
       let reason=info.desc;
       if(p.yellowRecallUsed)reason='Already used this turn';
       else if(p.coins<2)reason='Need 2 Lira';
       else if(!p.left.length)reason='No Assistants away right now';
-      return `<div class="card-row is-disabled"><div class="card-row-text"><strong>${info.title}</strong><span class="card-reason">${reason}</span></div></div>`;
+      return `<div class="card-row mosque-icon-row is-disabled"><img src="${img}" alt="${info.title}" title="${info.title} — ${reason}"></div>`;
     }
     return '';
   }).join('');
@@ -2336,14 +2353,14 @@ function renderAll(){renderTurnStatus();renderActionUI();updateReachable();place
   if(pendingFamilyRewards.length && !awaitingAction)showFamilyRewardUI();
   renderCardsPanel(p);
   markPlayerCountButtons();
-  logEl.innerHTML=gameLog.slice(0,10).map(x=>`<li>${x}</li>`).join('');requestAnimationFrame(()=>{placeAttachments();renderGemClaims();renderSultanPalaceCubes()});
+  if(logEl)logEl.innerHTML=gameLog.slice(0,10).map(x=>`<li>${x}</li>`).join('');requestAnimationFrame(()=>{placeAttachments();renderGemClaims();renderSultanPalaceCubes()});
 }
 
 // Event wiring
 if(actionBtn){actionBtn.onclick=performAction}
 if(endTurnBtn){endTurnBtn.onclick=()=>{if(awaitingAction){awaitingAction=false;if(pendingFamilyRewards.length){renderAll();return}}nextTurn()}}
 const useCardsBtn=document.getElementById('use-cards-btn');
-if(useCardsBtn){useCardsBtn.onclick=()=>{cardsPanelOpen=!cardsPanelOpen;renderCardsPanel(activePlayer())}}
+if(useCardsBtn){useCardsBtn.onclick=()=>{cardsPanelOpen=!cardsPanelOpen;renderAll()}}
 if(playerCountSelect){playerCountSelect.onchange=()=>newGame(safeInt(playerCountSelect.value,1))}
 document.querySelector('#new-game')?.addEventListener('click',()=>newGame(safeInt(playerCountSelect?.value,1)));
 // Player-count buttons: start a fresh game (new random 16-tile layout) with N players.
@@ -2571,6 +2588,7 @@ function mpApplySnapshot(s){
     if(ts) ts.textContent=`${mine?'Your turn':ap.name+"’s turn"} — ${ap.pos}${gameOver==='round'?' (final round)':''}`;
     const th=document.getElementById('turn-hint');
     if(th && !mine) th.textContent=`Waiting for ${ap.name} to take their turn…`;
+    renderTurnBadge(`${mine?'Your turn':ap.name+"’s turn"}${gameOver==='round'?' · final round':''}`,{color:cssColor(ap.color),mine});
   })();
 
   const my=MP.myColor;
