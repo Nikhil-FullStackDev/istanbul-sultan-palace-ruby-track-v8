@@ -1455,7 +1455,7 @@ function performGreenBonus(p){
     addLog(`${p.name} pays 2 Lira (Spice Mosque tile) for 1 additional ${GOOD_LABEL[good]}.`);
     persistPlayerState();
     if(awaitingAction&&actionInitiated&&actionInfo[p.pos]?.type==='warehouse')finishAction(true);
-  },{title:'Spice Mosque tile — 1 extra good for 2 Lira'});
+  },{title:'Spice Mosque tile — 1 extra good for 2 Lira',hideEndTurn:true});
 }
 // ---- In-page choice modal (replaces window.confirm / window.prompt) ----
 // options: [{label, value, img?, icon?}]. Resolves to the chosen value. No dismiss.
@@ -1477,7 +1477,7 @@ function modalChoice({title='Choose',options=[]}={}){
 const GOOD_ICON=g=>`assets/goods/good-${g}.png`;
 function goodPickButtons(options){return options.map(g=>`<button type="button" class="good-pick" data-good="${g}" title="${GOOD_LABEL[g]}"><img src="${GOOD_ICON(g)}" alt="${GOOD_LABEL[g]}"><span>${GOOD_LABEL[g]}</span></button>`).join('')}
 let pendingGoodChoice=null; // {options:[...], cb:fn, title:str}
-function chooseGood(options,cb,opts={}){pendingGoodChoice={options:options.slice(),cb,title:opts.title||'Choose a good'};renderAll()}
+function chooseGood(options,cb,opts={}){pendingGoodChoice={options:options.slice(),cb,title:opts.title||'Choose a good',hideEndTurn:!!opts.hideEndTurn};renderAll()}
 function resolveGoodChoice(g){const pc=pendingGoodChoice;if(!pc||!pc.options.includes(g))return;const keep=pc.cb(g);if(keep!==false)pendingGoodChoice=null;renderAll()}
 
 function renderActionUI(){
@@ -2205,6 +2205,10 @@ function renderTurnStatus(){
     actionBtn.disabled=true;actionBtn.textContent='Move to a tile first';
   }
   endTurnBtn.disabled=!awaitingAction;
+  // A mosque-card good picker (e.g. the Spice tile's "+1 good") resolves and
+  // removes itself the moment you pick a good — End Turn alongside it is just
+  // a confusing, redundant no-op, so hide it while that picker is open.
+  endTurnBtn.style.display=(pendingGoodChoice&&pendingGoodChoice.hideEndTurn)?'none':'';
 }
 // Spoken/written turn announcement — a brief banner whenever the active merchant changes.
 function announceTurn(force){
