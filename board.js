@@ -851,6 +851,8 @@ let caravanChoice=null;        // null | 'pick' (choosing which revealed card to
 let caravanPendingCards=[];    // legacy — kept for older persisted state
 let caravanOffer=[];           // the top-2 deck cards revealed for the Caravansary choice
 let blackGoodChoice='fabric';   // the non-Ring good picked at the Black Market
+let teaPicking=false;    // Tea House: waiting on the target-number modal pick
+let blackPicking=false;  // Black Market: waiting on the good-choice modal pick
 // ---- Bonus cards: 26 cards across 10 types (rulebook p.5) ----
 const BONUS_DEFS={
   good:      {count:4, name:'Gain 1 good of your choice',                                 phase:'any'},
@@ -1475,7 +1477,7 @@ function modalChoice({title='Choose',options=[]}={}){
 }
 // ---- Good-choice by icon (no typing) ----
 const GOOD_ICON=g=>`assets/goods/good-${g}.png`;
-function goodPickButtons(options){return options.map(g=>`<button type="button" class="good-pick" data-good="${g}" title="${GOOD_LABEL[g]}"><img src="${GOOD_ICON(g)}" alt="${GOOD_LABEL[g]}"><span>${GOOD_LABEL[g]}</span></button>`).join('')}
+function goodPickButtons(options){return options.map(g=>`<button type="button" class="good-pick" data-good="${g}" title="${GOOD_LABEL[g]}"><img src="${GOOD_ICON(g)}" alt="${GOOD_LABEL[g]}"></button>`).join('')}
 let pendingGoodChoice=null; // {options:[...], cb:fn, title:str}
 function chooseGood(options,cb,opts={}){pendingGoodChoice={options:options.slice(),cb,title:opts.title||'Choose a good',hideEndTurn:!!opts.hideEndTurn};renderAll()}
 function resolveGoodChoice(g){const pc=pendingGoodChoice;if(!pc||!pc.options.includes(g))return;const keep=pc.cb(g);if(keep!==false)pendingGoodChoice=null;renderAll()}
@@ -1497,13 +1499,20 @@ function renderStateChoiceModal(){
   }else if(caravanChoice==='pick'){
     title='Caravansary — take 1 card into your hand';
     sub=`The top ${caravanOffer.length} of the deck${bonusDiscard.length?`, or any of the ${bonusDiscard.length} face-up discard-pile cards`:''}. Revealed deck cards you don't keep go to the discard pile.`;
-    const offerBtns=caravanOffer.map((id,i)=>`<button type="button" class="choice-modal-btn" data-caravan-keep="offer:${i}" title="${bonusName(id)} — from the deck"><img src="${bonusImage(id)}" alt="${bonusName(id)}"><span>Deck card ${i+1}</span></button>`).join('');
-    const discBtns=bonusDiscard.map((id,i)=>`<button type="button" class="choice-modal-btn" data-caravan-keep="discard:${i}" title="${bonusName(id)} — from the discard pile"><img src="${bonusImage(id)}" alt="${bonusName(id)}"><span>Discard${i===bonusDiscard.length-1?' (top)':''}</span></button>`).join('');
+    const offerBtns=caravanOffer.map((id,i)=>`<button type="button" class="choice-modal-btn" data-caravan-keep="offer:${i}" title="${bonusName(id)} — from the deck"><img src="${bonusImage(id)}" alt="${bonusName(id)}"></button>`).join('');
+    const discBtns=bonusDiscard.map((id,i)=>`<button type="button" class="choice-modal-btn" data-caravan-keep="discard:${i}" title="${bonusName(id)} — from the discard pile${i===bonusDiscard.length-1?' (top)':''}"><img src="${bonusImage(id)}" alt="${bonusName(id)}"></button>`).join('');
     body=offerBtns+discBtns;
   }else if(pendingFamilyRewards.length && !awaitingAction){
     const target=pendingFamilyRewards[0];
     title=`Family Member caught: ${target}`;
-    body=`<button type="button" class="choice-modal-btn" data-family-reward="bonus"><span>1 Bonus card</span></button><button type="button" class="choice-modal-btn" data-family-reward="lira"><span>3 Lira</span></button>`;
+    body=`<button type="button" class="choice-modal-btn" data-family-reward="bonus" title="1 Bonus card"><img src="assets/cards-review/cards/icon-bonus-cards/icon-bonus-card-01.png" alt="1 Bonus card"></button><button type="button" class="choice-modal-btn" data-family-reward="lira" title="3 Lira"><img src="assets/coins/coin-5.png" alt="3 Lira"></button>`;
+  }else if(teaPicking && !pendingDice){
+    title='Tea House — pick your target';
+    sub='Roll 2 dice: hit your target and win that many Lira, otherwise 2 Lira.';
+    body=Array.from({length:10},(_,i)=>i+3).map(n=>`<button type="button" class="tea-target-btn" data-tea-target="${n}" title="Target ${n}">${n}</button>`).join('');
+  }else if(blackPicking && !pendingDice){
+    title='Black Market — pick 1 good to gain';
+    body=['fabric','spice','fruit'].map(g=>`<button type="button" class="good-pick" data-black-good="${g}" title="${GOOD_LABEL[g]}"><img src="${GOOD_ICON(g)}" alt="${GOOD_LABEL[g]}"></button>`).join('');
   }else{
     return;
   }
@@ -1533,13 +1542,11 @@ function renderActionUI(){
       diceTray.innerHTML=`<span class="dice-caption">Tea House rolled ${pendingDice.dice[0]} + ${pendingDice.dice[1]} = ${pendingDice.total}${pendingDice.canModify?' — choose a dice option below.':'.'}</span>`;
       diceTray.classList.add('has-roll');
     }else{
-      const n=teaTarget??6;diceTray.innerHTML=`<span class="dice-caption">Tea House target</span><input id="tea-target" class="tea-target" type="number" min="3" max="12" value="${n}"><button type="button" id="roll-tea">Roll Dice</button>`;diceTray.classList.add('has-roll');
+      // The target pick (and the roll it triggers) happens in the big choice modal.
+      diceTray.innerHTML=`<span class="dice-caption">Choose your target from the popup.</span>`;diceTray.classList.add('has-roll');
     }
   }else if(info.type==='black'){
-    const opts=['fabric','spice','fruit'];
-    if(!opts.includes(blackGoodChoice))blackGoodChoice='fabric';
-    const picks=opts.map(g=>`<button type="button" class="good-pick ${g===blackGoodChoice?'is-selected':''}" data-black-good="${g}" title="${GOOD_LABEL[g]}"><img src="${GOOD_ICON(g)}" alt="${GOOD_LABEL[g]}"><span>${GOOD_LABEL[g]}</span></button>`).join('');
-    diceTray.innerHTML=`<span class="dice-caption">Take 1 good of your choice:</span><div class="good-pick-row">${picks}</div><span class="dice-caption">then <strong>Do action at Black Market</strong> rolls 2 dice — 7–8 → 1 Ring · 9–10 → 2 · 11–12 → 3.</span>`;diceTray.classList.add('has-roll');
+    diceTray.innerHTML=`<span class="dice-caption">Choose a good from the popup — then rolls 2 dice: 7–8 → 1 Ring · 9–10 → 2 · 11–12 → 3.</span>`;diceTray.classList.add('has-roll');
   }else if(info.type==='marketSmall'||info.type==='marketLarge'){
     const type=info.type==='marketSmall'?'small':'large',idx=currentDemand(type);const img=marketDeckImage(type);const need=demandCounts(idx);
     const flex=bonusMarketFlex&&type==='small';
@@ -1547,9 +1554,14 @@ function renderActionUI(){
       diceTray.innerHTML=`<img src="${img}" alt="Demand tile" style="width:52px;height:76px;object-fit:cover;border-radius:6px"><span class="dice-caption">Press <strong>Do action at ${type==='small'?'Small':'Large'} Market</strong> to sell.</span>`;
     }else{
       const goodsList=flex?GOODS:GOODS.filter(g=>(need[g]||0)>0);
-      const rows=goodsList.map(g=>{const cap=flex?Math.min(5,p.goods[g]||0):Math.min(need[g]||0,p.goods[g]||0);return `<label style="display:flex;align-items:center;gap:4px">${GOOD_LABEL[g]} <span class="dice-caption">${flex?'':`(demand ${need[g]})`}</span> <input class="market-q" data-good="${g}" type="number" min="0" max="${cap}" value="${Math.min(marketQuantities[g]||0,cap)}" style="width:46px"></label>`}).join('');
+      const rows=goodsList.map(g=>{
+        const cap=flex?Math.min(5,p.goods[g]||0):Math.min(need[g]||0,p.goods[g]||0);
+        const qty=Math.max(0,Math.min(cap,safeInt(marketQuantities[g],0)));
+        marketQuantities[g]=qty;
+        return `<div class="market-good" title="${GOOD_LABEL[g]}${flex?'':` (demand ${need[g]})`}"><img src="${GOOD_ICON(g)}" alt="${GOOD_LABEL[g]}"><span class="market-qty">${qty}</span><span class="qty-stepper"><button type="button" class="qty-chevron" data-market-step="${g}:1" ${qty>=cap?'disabled':''} aria-label="More ${GOOD_LABEL[g]}">▲</button><button type="button" class="qty-chevron" data-market-step="${g}:-1" ${qty<=0?'disabled':''} aria-label="Less ${GOOD_LABEL[g]}">▼</button></span></div>`;
+      }).join('');
       const demanded=GOODS.reduce((s,g)=>s+(need[g]||0),0);
-      diceTray.innerHTML=`<img src="${img}" alt="Demand tile" style="width:52px;height:76px;object-fit:cover;border-radius:6px"><span class="dice-caption">${flex?`Bonus card: sell exactly ${demanded} goods, any types.`:'Sell 1–5 goods shown on this demand tile.'}</span>${rows}<button type="button" id="sell-market">Sell</button>`;
+      diceTray.innerHTML=`<img src="${img}" alt="Demand tile" style="width:52px;height:76px;object-fit:cover;border-radius:6px"><span class="dice-caption">${flex?`Bonus card: sell exactly ${demanded} goods, any types.`:'Sell 1–5 goods shown on this demand tile.'}</span><div class="market-goods-row">${rows}</div><button type="button" id="sell-market">Sell</button>`;
     }
     diceTray.classList.add('has-roll');
   }else if(info.type==='mosqueSmall'||info.type==='mosqueGreat'){
@@ -1559,7 +1571,7 @@ function renderActionUI(){
       const req=mosqueStacks[mosque][g]?.[0];
       if(!req)return '';
       const affordable=(p.goods[g]||0)>=req;
-      return `<button type="button" class="mosque-top-card ${affordable?'':'is-unaffordable'}" data-mosque="${mosque}" data-good="${g}" ${affordable?'':'disabled'}><img src="${mosqueCardImage(mosque,g,req)}" alt="${mosque} ${GOOD_LABEL[g]} top card"><span>${GOOD_LABEL[g]} · ${req} goods</span></button>`;
+      return `<button type="button" class="mosque-top-card ${affordable?'':'is-unaffordable'}" data-mosque="${mosque}" data-good="${g}" ${affordable?'':'disabled'} title="${GOOD_LABEL[g]} · ${req} goods"><img src="${mosqueCardImage(mosque,g,req)}" alt="${mosque} ${GOOD_LABEL[g]} top card"></button>`;
     }).join('');
     diceTray.innerHTML=`<span class="dice-caption">Select one of the two top ${mosque} Mosque cards.</span><div class="mosque-top-cards">${preview}</div>`;diceTray.classList.add('has-roll');
   }else if(info.type==='fountain'){
@@ -1597,7 +1609,7 @@ function renderActionUI(){
   }else diceTray.classList.remove('has-roll');
 }
 
-function beginTileAction(p,name){teaTarget=null;lastDiceRoll=null;pendingDice=null;pendingBonusDiceEffect=null;blackGoodChoice='fabric';marketQuantities={fabric:0,spice:0,fruit:0,heirloom:0};if(name==='Tea House')teaTarget=6}
+function beginTileAction(p,name){teaTarget=null;lastDiceRoll=null;pendingDice=null;pendingBonusDiceEffect=null;blackGoodChoice='fabric';teaPicking=false;blackPicking=false;marketQuantities={fabric:0,spice:0,fruit:0,heirloom:0};if(name==='Tea House')teaTarget=6}
 
 function resolveCore(p,name,{skipEncounters=false}={}){
   const info=actionInfo[name];if(!info)return true;const type=info.type;
@@ -1627,7 +1639,7 @@ function resolveCore(p,name,{skipEncounters=false}={}){
   if(type==='mosqueSmall'||type==='mosqueGreat')return false;
   if(type==='tea'){
     if(!pendingDice){
-      const target=safeInt(document.querySelector('#tea-target')?.value??teaTarget,teaTarget??6);
+      const target=safeInt(teaTarget,6);
       if(target<3||target>12){addLog('Tea House target must be 3–12.');return false}
       teaTarget=target;
       const dice=rollDice();
@@ -1649,8 +1661,10 @@ function resolveCore(p,name,{skipEncounters=false}={}){
     return false;
   }
   if(type==='marketSmall'||type==='marketLarge'){
-    const market=type==='marketSmall'?'small':'large';const need=demandCounts(currentDemand(market));const flex=bonusMarketFlex&&market==='small';const qs={...marketQuantities};let count=0;
-    document.querySelectorAll('.market-q').forEach(i=>{const g=i.dataset.good;qs[g]=Math.max(0,Math.min(5,p.goods[g]||0,safeInt(i.value,0)));i.value=String(qs[g]);count+=qs[g]});
+    const market=type==='marketSmall'?'small':'large';const need=demandCounts(currentDemand(market));const flex=bonusMarketFlex&&market==='small';const qs={};let count=0;
+    // Quantities are tracked live in marketQuantities by the chevron buttons —
+    // no input elements to scrape.
+    GOODS.forEach(g=>{qs[g]=Math.max(0,Math.min(5,p.goods[g]||0,safeInt(marketQuantities[g],0)));count+=qs[g]});
     if(count<1||count>5){addLog('Choose between 1 and 5 goods to sell.');return false}
     if(GOODS.some(g=>qs[g]>(p.goods[g]||0))){addLog('You cannot sell more goods than you carry.');return false}
     if(flex){
@@ -1734,6 +1748,11 @@ function performAction(){
     if(pendingDice.canModify){renderAll();return}
     finalizePendingDice();return;
   }
+  // Target / good picked in the big choice modal — not by typing or a
+  // separate "Roll Dice" button. Picking there resolves the roll directly;
+  // pressing Action here just opens that modal.
+  if(info.type==='tea'&&!pendingDice){ if(!teaPicking){teaPicking=true;renderAll()} return; }
+  if(info.type==='black'&&!pendingDice){ if(!blackPicking){blackPicking=true;renderAll()} return; }
   const ok=resolveCore(p,p.pos);if(ok===false){
     // A Palace / Gemstone Dealer / Wainwright purchase can fail because the player
     // lacks the required goods or Lira; keep the action open (and re-enable the
@@ -1771,7 +1790,7 @@ function nextTurn(){
   bonusMoveMax=2;bonusDoubleAction=null;bonusMarketFlex=false;bonusReusePlace=false;
   // A turn ended mid-Caravansary: return any revealed-but-unkept cards to the deck.
   if(caravanOffer.length){bonusDeck.unshift(...caravanOffer);}
-  caravanChoice=null;caravanPendingCards=[];caravanOffer=[];marketQuantities={fabric:0,spice:0,fruit:0,heirloom:0};teaTarget=null;blackGoodChoice='fabric';pendingGoodChoice=null;pendingPalaceAny=false;
+  caravanChoice=null;caravanPendingCards=[];caravanOffer=[];marketQuantities={fabric:0,spice:0,fruit:0,heirloom:0};teaTarget=null;blackGoodChoice='fabric';teaPicking=false;blackPicking=false;pendingGoodChoice=null;pendingPalaceAny=false;
   turn=(turn+1)%players.length;awaitingAction=false;actionInitiated=false;pendingAssistantDrop=false;pendingDice=null;familyActionTarget=null;familyActionMode=false;pendingFamilyCatch=null;lastDiceRoll=null;
   players.forEach(p=>{p.yellowRecallUsed=false;p.greenBonusUsed=false});
   renderAll();
@@ -2043,6 +2062,10 @@ function moveSultanCubeToColumn(cube,next){
   return true;
 }
 function bindSultanCubeDragging(){
+  // These cubes are a pure goods-count display now (kept in sync automatically
+  // by syncSultanCubeToGood) — dragging them was only ever for the board
+  // layout editor, not something a player should do mid-game.
+  if(!playerBoardEditMode)return;
   boardsEl.querySelectorAll('[data-sultan-cube]').forEach(btn=>{
     let dragState=null,moved=false;
     btn.addEventListener('pointerdown',e=>{
@@ -2182,7 +2205,7 @@ function playerBoardCardHTML(p){
     }).join('');
     // One "Hand" holding every kind of card the player owns (Bonus cards + Mosque tiles).
     const handHtml=(cardHand+mosqueHand)||'<span class="empty-card-slot">No cards</span>';
-    return `<div class="player-board-card ${p.id===turn&&!gameOver?'is-current':''}"><h3><span class="dot" style="background:${cssColor(p.color)}"></span>${p.name}</h3><div class="player-board-stage"><span class="sultan-row-arrow-spacer" aria-hidden="true"></span><div class="cart-board-wrap"><img class="wheelbarrow-art" src="assets/player-pieces/cart-board.png" alt="${p.name} wheelbarrow" draggable="false"><div class="player-board-layers-layer">${layersHtml}</div><div class="player-board-slot-locks">${slotLocksHtml}</div><div class="sultan-cubes-layer">${cubes}</div><div class="cart-vertical-locks">${locks}</div></div>${renderCoinRack(p)}<div class="player-card-sidebar"><div class="bonus-hand-area"><span class="card-area-label">Hand</span><div class="bonus-card-row">${handHtml}</div></div><div class="discard-area"><span class="card-area-label">Discard</span><div class="discard-slot ${bonusDiscard.length?'has-cards':''}" data-player="${p.id}">${bonusDiscard.length?`<img src="${bonusImage(bonusDiscard[bonusDiscard.length-1])}" alt="Top discard: ${bonusName(bonusDiscard[bonusDiscard.length-1])}"><span>x${bonusDiscard.length}</span>`:'<span>Drop card here</span>'}</div></div></div><span class="sultan-row-arrow-spacer" aria-hidden="true"></span></div></div>`;
+    return `<div class="player-board-card ${p.id===turn&&!gameOver?'is-current':''}"><div class="player-board-stage"><span class="sultan-row-arrow-spacer" aria-hidden="true"></span><div class="cart-board-wrap"><img class="wheelbarrow-art" src="assets/player-pieces/cart-board.png" alt="${p.name} wheelbarrow" draggable="false"><div class="player-board-layers-layer">${layersHtml}</div><div class="player-board-slot-locks">${slotLocksHtml}</div><div class="sultan-cubes-layer">${cubes}</div><div class="cart-vertical-locks">${locks}</div></div>${renderCoinRack(p)}<div class="player-card-sidebar"><div class="bonus-hand-area"><span class="card-area-label">Hand</span><div class="bonus-card-row">${handHtml}</div></div><div class="discard-area"><span class="card-area-label">Discard</span><div class="discard-slot ${bonusDiscard.length?'has-cards':''}" data-player="${p.id}">${bonusDiscard.length?`<img src="${bonusImage(bonusDiscard[bonusDiscard.length-1])}" alt="Top discard: ${bonusName(bonusDiscard[bonusDiscard.length-1])}"><span>x${bonusDiscard.length}</span>`:'<span>Drop card here</span>'}</div></div></div><span class="sultan-row-arrow-spacer" aria-hidden="true"></span></div></div>`;
 }
 function bindPlayerBoardsInteractions(){
   boardsEl.querySelectorAll('[data-sultan-cube]').forEach(b=>b.oncontextmenu=e=>e.preventDefault());
@@ -2384,27 +2407,37 @@ document.querySelector('#join-code')?.addEventListener('keydown',e=>{if(e.key===
 
 document.addEventListener('click',e=>{
   const t=e.target;
-  if(t?.id==='roll-tea'){
-    const p=activePlayer();
-    const target=safeInt(document.querySelector('#tea-target')?.value,6);
-    if(target>=3&&target<=12){
-      // A new Tea House roll must always begin a fresh Bonus-card decision.
-      // Do not allow a stale phase from a previous Tea House action to leak into this roll.
-      pendingDice=null;
-      pendingBonusDiceEffect=null;
-      resolveCore(p,'Tea House');
-      // resolveCore creates pendingDice. Re-render after the roll so the entry
-      // control is guaranteed to be present in the current turn UI.
-      renderAll();
-    }
-    return;
-  }
-  if(t?.id==='roll-black'){const p=activePlayer();resolveCore(p,'Black Market');renderAll()}
   if(t?.id==='sell-market'){const p=activePlayer();const place=familyActionMode&&familyActionTarget?familyActionTarget:p?.pos;if(p&&place) {const ok=resolveCore(p,place,{skipEncounters:familyActionMode});if(ok!==false){finishAction(true);renderAll()} else {renderAll()}}}
   if(t?.id==='return-fountain'){const p=activePlayer();if(familyActionMode&&familyActionTarget==='Fountain'&&p){const selected=[...document.querySelectorAll('.fountain-pick:checked')].map(x=>x.value);p.left=p.left.filter(x=>!selected.includes(x));p.assistants=Math.min(5,p.assistants+selected.length);addLog(`${p.name} returns ${selected.length} Assistant${selected.length===1?'':'s'} at the Fountain through the Family Member action.`);finishAction(false)}else performAction();}
   if(t?.id==='post-claim')performAction();
+  // Black Market's good pick lives in the big choice modal now — picking it
+  // resolves the roll directly (no separate "Roll Dice" button).
   const blackGoodBtn=t?.closest?.('[data-black-good]');
-  if(blackGoodBtn){blackGoodChoice=blackGoodBtn.dataset.blackGood;renderActionUI();return}
+  if(blackGoodBtn){
+    const p=activePlayer();blackGoodChoice=blackGoodBtn.dataset.blackGood;blackPicking=false;
+    pendingDice=null;pendingBonusDiceEffect=null;
+    resolveCore(p,p.pos);renderAll();return;
+  }
+  const teaTargetBtn=t?.closest?.('[data-tea-target]');
+  if(teaTargetBtn){
+    const p=activePlayer();teaTarget=safeInt(teaTargetBtn.dataset.teaTarget,6);teaPicking=false;
+    pendingDice=null;pendingBonusDiceEffect=null;
+    resolveCore(p,p.pos);renderAll();return;
+  }
+  const marketStepBtn=t?.closest?.('[data-market-step]');
+  if(marketStepBtn){
+    const [g,delta]=marketStepBtn.dataset.marketStep.split(':');
+    const p=activePlayer();const place=familyActionMode&&familyActionTarget?familyActionTarget:p?.pos;
+    const mtype=p&&place?actionInfo[place]?.type:null;
+    if(p&&(mtype==='marketSmall'||mtype==='marketLarge')){
+      const market=mtype==='marketSmall'?'small':'large';
+      const need=demandCounts(currentDemand(market));const flex=bonusMarketFlex&&market==='small';
+      const cap=flex?Math.min(5,p.goods[g]||0):Math.min(need[g]||0,p.goods[g]||0);
+      marketQuantities[g]=Math.max(0,Math.min(cap,safeInt(marketQuantities[g],0)+Number(delta)));
+      renderActionUI();
+    }
+    return;
+  }
   const caravanKeepBtn=t?.closest?.('[data-caravan-keep]');
   if(caravanKeepBtn){caravanKeep(caravanKeepBtn.dataset.caravanKeep);return}
   if(t?.id==='green-bonus')performGreenBonus(activePlayer());
@@ -2418,19 +2451,6 @@ document.addEventListener('click',e=>{
   }
 });
 
-document.addEventListener('input',e=>{
-  if(e.target.id==='tea-target'){teaTarget=safeInt(e.target.value,6);return}
-  if(e.target.classList.contains('market-q')){
-    const p=activePlayer();const g=e.target.dataset.good;
-    const mtype=actionInfo[p?.pos]?.type;
-    const isMarket=mtype==='marketSmall'||mtype==='marketLarge';
-    const need=p&&isMarket?demandCounts(currentDemand(mtype==='marketSmall'?'small':'large')):{};
-    const flex=bonusMarketFlex&&mtype==='marketSmall';
-    const cap=p?(flex?Math.min(5,p.goods[g]||0):Math.min(need[g]||0,p.goods[g]||0)):0;
-    const v=Math.max(0,Math.min(cap,safeInt(e.target.value,0)));
-    e.target.value=String(v);marketQuantities[g]=v;
-  }
-});
 
 // opts.layout: 'random' → fresh random layout + new seed; a number → that seed;
 // undefined → keep whatever board is currently up (page reload / re-init).
@@ -2455,7 +2475,7 @@ function newGame(count,opts={}){
   localStorage.setItem('istanbul-game-count',String(count));
   localStorage.removeItem('istanbul-player-state');
   // Clear any half-finished turn state left over from the previous game.
-  caravanChoice=null;caravanPendingCards=[];caravanOffer=[];marketQuantities={fabric:0,spice:0,fruit:0,heirloom:0};blackGoodChoice='fabric';pendingGoodChoice=null;pendingPalaceAny=false;
+  caravanChoice=null;caravanPendingCards=[];caravanOffer=[];marketQuantities={fabric:0,spice:0,fruit:0,heirloom:0};blackGoodChoice='fabric';teaPicking=false;blackPicking=false;pendingGoodChoice=null;pendingPalaceAny=false;
   pendingDice=null;pendingFamilyRewards=[];familyActionMode=false;familyActionTarget=null;familyPlacementMode=false;pendingFamilyCatch=null;
   bonusMoveMax=2;bonusDoubleAction=null;bonusMarketFlex=false;bonusReusePlace=false;pendingAssistantDrop=false;
   // A new game always starts with an empty Ruby row (slots 25–30).
@@ -2634,7 +2654,7 @@ function mpSetTurnGate(){
 
 // ---- click describe / replay -------------------------------------
 function mpDescribeClick(target){
-  const t=target.closest?.('.tile[data-location],#do-action,#end-turn,#roll-tea,#roll-black,#return-fountain,.choice-modal-btn,.good-pick,[data-dice-mod],.bonus-card-chip[data-bonus-card],.mosque-card-chip[data-mosque-ability],[data-caravan-keep],[data-family-reward]');
+  const t=target.closest?.('.tile[data-location],#do-action,#end-turn,#return-fountain,#sell-market,.choice-modal-btn,.good-pick,.mosque-top-card[data-mosque],[data-dice-mod],.bonus-card-chip[data-bonus-card],.mosque-card-chip[data-mosque-ability],[data-caravan-keep],[data-family-reward],[data-tea-target],[data-market-step]');
   if(!t) return null;
   if(t.dataset && t.dataset.location) return {kind:'tile', loc:t.dataset.location};
   // Check these two before the generic .choice-modal-btn fallback below — the
@@ -2642,6 +2662,9 @@ function mpDescribeClick(target){
   // but identifies its buttons by these dataset attrs, not data-i.
   if(t.dataset && t.dataset.caravanKeep) return {kind:'caravan', v:t.dataset.caravanKeep};
   if(t.dataset && t.dataset.familyReward) return {kind:'family', v:t.dataset.familyReward};
+  if(t.dataset && t.dataset.teaTarget) return {kind:'tea', v:t.dataset.teaTarget};
+  if(t.dataset && t.dataset.marketStep) return {kind:'mstep', v:t.dataset.marketStep};
+  if(t.classList.contains('mosque-top-card')) return {kind:'mtop', mosque:t.dataset.mosque, good:t.dataset.good};
   if(t.classList.contains('choice-modal-btn')) return {kind:'modal', i:t.dataset.i};
   if(t.classList.contains('good-pick')) return {kind:'good', g:t.dataset.good||t.dataset.blackGood||''};
   if(t.dataset && t.dataset.diceMod) return {kind:'dmod', v:t.dataset.diceMod};
@@ -2664,6 +2687,9 @@ function mpReplayClick(from, d){
   else if(d.kind==='mosque') el=q(`.mosque-card-chip[data-mosque-ability="${d.ability}"]`);
   else if(d.kind==='caravan') el=q(`[data-caravan-keep="${d.v}"]`);
   else if(d.kind==='family') el=q(`[data-family-reward="${d.v}"]`);
+  else if(d.kind==='tea') el=q(`[data-tea-target="${d.v}"]`);
+  else if(d.kind==='mstep') el=q(`[data-market-step="${(window.CSS&&CSS.escape)?CSS.escape(d.v):d.v}"]`);
+  else if(d.kind==='mtop') el=q(`.mosque-top-card[data-mosque="${d.mosque}"][data-good="${d.good}"]`);
   else if(d.kind==='val'){ const i=document.getElementById(d.id); if(i) i.value=d.value; return; }
   else if(d.kind==='fpick'){ const c=[...document.querySelectorAll('.fountain-pick')].find(x=>x.value===d.value); if(c) c.checked=d.checked; return; }
   if(el) el.click();
@@ -2684,8 +2710,7 @@ if(MP){
   document.addEventListener('change', e=>{
     if(MP.role!=='guest') return;
     const el=e.target;
-    if(el.id==='tea-target') MP.sendInput({kind:'val', id:'tea-target', value:el.value});
-    else if(el.classList && el.classList.contains('fountain-pick')) MP.sendInput({kind:'fpick', value:el.value, checked:el.checked});
+    if(el.classList && el.classList.contains('fountain-pick')) MP.sendInput({kind:'fpick', value:el.value, checked:el.checked});
   }, true);
 
   MP.onState = s=>{ if(MP.role==='guest') mpApplySnapshot(s); };
