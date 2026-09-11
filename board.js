@@ -1480,6 +1480,48 @@ let pendingGoodChoice=null; // {options:[...], cb:fn, title:str}
 function chooseGood(options,cb,opts={}){pendingGoodChoice={options:options.slice(),cb,title:opts.title||'Choose a good',hideEndTurn:!!opts.hideEndTurn};renderAll()}
 function resolveGoodChoice(g){const pc=pendingGoodChoice;if(!pc||!pc.options.includes(g))return;const keep=pc.cb(g);if(keep!==false)pendingGoodChoice=null;renderAll()}
 
+// ---- Big choice modal ----------------------------------------------------
+// Anything that offers the player a pick — Caravansary cards, a "choose a
+// good" prompt, a Family-Member-catch reward — shows here: a full-screen
+// overlay in front of the board (never the cramped, scrollable side panel),
+// with every option laid out side by side. Separate element id from
+// modalChoice()'s own #choice-modal-backdrop (used for the async Yes/No-style
+// pickers) so the two never fight over the same node; both feed the same
+// mpSnapshot "modalHTML" sync so multiplayer guests see them too.
+function renderStateChoiceModal(){
+  document.getElementById('state-choice-modal')?.remove();
+  let title='',sub='',body='';
+  if(pendingGoodChoice){
+    title=pendingGoodChoice.title;
+    body=goodPickButtons(pendingGoodChoice.options);
+  }else if(caravanChoice==='pick'){
+    title='Caravansary — take 1 card into your hand';
+    sub=`The top ${caravanOffer.length} of the deck${bonusDiscard.length?`, or any of the ${bonusDiscard.length} face-up discard-pile cards`:''}. Revealed deck cards you don't keep go to the discard pile.`;
+    const offerBtns=caravanOffer.map((id,i)=>`<button type="button" class="choice-modal-btn" data-caravan-keep="offer:${i}" title="${bonusName(id)} — from the deck"><img src="${bonusImage(id)}" alt="${bonusName(id)}"><span>Deck card ${i+1}</span></button>`).join('');
+    const discBtns=bonusDiscard.map((id,i)=>`<button type="button" class="choice-modal-btn" data-caravan-keep="discard:${i}" title="${bonusName(id)} — from the discard pile"><img src="${bonusImage(id)}" alt="${bonusName(id)}"><span>Discard${i===bonusDiscard.length-1?' (top)':''}</span></button>`).join('');
+    body=offerBtns+discBtns;
+  }else if(pendingFamilyRewards.length && !awaitingAction){
+    const target=pendingFamilyRewards[0];
+    title=`Family Member caught: ${target}`;
+    body=`<button type="button" class="choice-modal-btn" data-family-reward="bonus"><span>1 Bonus card</span></button><button type="button" class="choice-modal-btn" data-family-reward="lira"><span>3 Lira</span></button>`;
+  }else{
+    return;
+  }
+  const back=document.createElement('div');
+  back.id='state-choice-modal';back.className='choice-modal-backdrop';
+  back.innerHTML=`<div class="choice-modal choice-modal-wide" role="dialog" aria-modal="true"><h3>${title}</h3>${sub?`<p class="choice-modal-sub">${sub}</p>`:''}<div class="choice-modal-opts">${body}</div></div>`;
+  document.body.append(back);
+  back.querySelectorAll('.good-pick[data-good]').forEach(b=>b.onclick=()=>resolveGoodChoice(b.dataset.good));
+  back.querySelectorAll('[data-family-reward]').forEach(b=>b.onclick=()=>{
+    const p=activePlayer(),target=pendingFamilyRewards[0],choice=b.dataset.familyReward;
+    if(choice==='bonus')takeBonus(p,1);else p.coins+=3;
+    addLog(`${p.name} takes ${choice==='bonus'?'1 Bonus card':'3 Lira'} for catching ${target}'s Family Member.`);
+    pendingFamilyRewards.shift();persistPlayerState();
+    resolvePendingFamilyRewards();
+  });
+  // [data-caravan-keep] is handled by the existing global document click delegate.
+}
+
 function renderActionUI(){
   const p=activePlayer();
   if(!p||!awaitingAction){ if(typeof diceTray!=='undefined'&&diceTray){diceTray.innerHTML='';diceTray.classList.remove('has-roll');} return; }
@@ -1526,9 +1568,9 @@ function renderActionUI(){
     const r=postUncovered();diceTray.innerHTML=`<span class="dice-caption">Uncovered: ${r.map(x=>x.coins?`${x.coins} Lira`:GOOD_LABEL[x.good]).join(', ')}</span>`;diceTray.classList.add('has-roll');
   }else if(info.type==='caravan'){
     if(caravanChoice==='pick'){
-      const offerBtns=caravanOffer.map((id,i)=>`<button type="button" class="caravan-source is-deck" data-caravan-keep="offer:${i}" title="${bonusName(id)} — from the deck"><img src="${bonusImage(id)}" alt="${bonusName(id)}"><span>Deck card ${i+1}</span></button>`).join('');
-      const discBtns=bonusDiscard.map((id,i)=>`<button type="button" class="caravan-source is-discard" data-caravan-keep="discard:${i}" title="${bonusName(id)} — from the discard pile"><img src="${bonusImage(id)}" alt="${bonusName(id)}"><span>Discard${i===bonusDiscard.length-1?' (top)':''}</span></button>`).join('');
-      diceTray.innerHTML=`<span class="dice-caption">Caravansary — take 1 card into your hand: the top ${caravanOffer.length} of the deck${bonusDiscard.length?`, or any of the ${bonusDiscard.length} face-up discard-pile cards`:''}.</span><div class="caravan-source-choices">${offerBtns}${discBtns}</div><span class="dice-caption">Revealed deck cards you don't keep go to the discard pile.</span>`;
+      // The actual pick happens in the big choice modal (renderStateChoiceModal) —
+      // full-width, in front of the board, so every offered card fits with no scrolling.
+      diceTray.innerHTML=`<span class="dice-caption">Choose a card from the popup.</span>`;
     }else{
       diceTray.innerHTML=`<span class="dice-caption">Press <strong>Do action at Caravansary</strong> to reveal the top 2 Bonus cards.</span>`;
     }
@@ -1660,15 +1702,9 @@ function resolvePendingFamilyRewards(){
   if(pendingFamilyRewards.length){renderAll();return}
   if(gameOver==='round'&&turn===0){const w=finalWinner();gameOver=true;addLog(`🏆 ${w.name} wins with ${w.rubies} Rubies.`)}else nextTurn();
 }
-function showFamilyRewardUI(){
-  const p=activePlayer();if(!p||!pendingFamilyRewards.length)return;
-  const target=pendingFamilyRewards[0];const panel=document.querySelector('.turn-actions');if(!panel)return;
-  const existing=document.querySelector('#family-reward-ui');existing?.remove();const el=document.createElement('div');el.id='family-reward-ui';el.innerHTML=`<span>Family Member caught: ${target}. Reward:</span> <button type="button" data-family-reward="bonus">1 Bonus card</button> <button type="button" data-family-reward="lira">3 Lira</button>`;panel.append(el);
-  el.querySelectorAll('[data-family-reward]').forEach(b=>b.onclick=()=>{const choice=b.dataset.familyReward;if(choice==='bonus')takeBonus(p,1);else p.coins+=3;addLog(`${p.name} takes ${choice==='bonus'?'1 Bonus card':'3 Lira'} for catching ${target}'s Family Member.`);pendingFamilyRewards.shift();persistPlayerState();el.remove();if(pendingFamilyRewards.length)showFamilyRewardUI();else resolvePendingFamilyRewards()});
-}
 function afterMoveFamilyEncounters(location,p){
   pendingFamilyRewards=players.filter(q=>q!==p&&q.familyPos===location&&location!=='Police Station').map(q=>{q.familyPos='Police Station';return q.name});
-  if(pendingFamilyRewards.length)showFamilyRewardUI();
+  if(pendingFamilyRewards.length)renderAll();
 }
 
 function performAction(){
@@ -1715,6 +1751,7 @@ function nextTurn(){
   { const ap=activePlayer(); if(ap&&ap._realPos){ap.pos=ap._realPos;delete ap._realPos;} }
   familyPlacementMode=false;
   document.querySelector('#choice-modal-backdrop')?.remove();
+  document.querySelector('#state-choice-modal')?.remove();
   // If the turn is ended while a Tea House / Black Market roll is still pending
   // (Red Mosque option not taken), settle it first so the payout isn't lost.
   if(pendingDice){
@@ -2302,17 +2339,7 @@ function renderAll(){renderTurnStatus();renderActionUI();updateReachable();place
       panel.append(el);
     }
   }
-  document.querySelector('#good-choice-ui')?.remove();
-  if(pendingGoodChoice){
-    const panel=document.querySelector('.turn-actions');
-    if(panel){
-      const el=document.createElement('div');el.id='good-choice-ui';
-      el.innerHTML=`<span>${pendingGoodChoice.title}:</span><div class="good-pick-row">${goodPickButtons(pendingGoodChoice.options)}</div>`;
-      panel.append(el);
-      el.querySelectorAll('.good-pick[data-good]').forEach(b=>b.onclick=()=>resolveGoodChoice(b.dataset.good));
-    }
-  }
-  if(pendingFamilyRewards.length && !awaitingAction)showFamilyRewardUI();
+  renderStateChoiceModal();
   markPlayerCountButtons();
   if(logEl)logEl.innerHTML=gameLog.slice(0,10).map(x=>`<li>${x}</li>`).join('');requestAnimationFrame(()=>{placeAttachments();renderGemClaims();renderSultanPalaceCubes()});
 }
@@ -2519,7 +2546,7 @@ function mpSnapshot(){
     palaceRubyIndex, gemstoneRubyIndex,
     panelHTML: panel ? panel.innerHTML : '',
     wheelbarrows: Object.fromEntries(players.map(p=>[p.color, playerBoardCardHTML(p)])),
-    modalHTML: document.getElementById('choice-modal-backdrop')?.outerHTML || null,
+    modalHTML: document.getElementById('choice-modal-backdrop')?.outerHTML || document.getElementById('state-choice-modal')?.outerHTML || null,
     toast: document.getElementById('turn-toast')?.textContent || '',
   };
 }
@@ -2573,6 +2600,7 @@ function mpApplySnapshot(s){
   bindPlayerBoardsInteractions();
 
   document.getElementById('choice-modal-backdrop')?.remove();
+  document.getElementById('state-choice-modal')?.remove();
   if(s.modalHTML) document.body.insertAdjacentHTML('beforeend', s.modalHTML);
 
   mpSetTurnGate();
@@ -2606,9 +2634,14 @@ function mpSetTurnGate(){
 
 // ---- click describe / replay -------------------------------------
 function mpDescribeClick(target){
-  const t=target.closest?.('.tile[data-location],#do-action,#end-turn,#roll-tea,#roll-black,#return-fountain,.choice-modal-btn,.good-pick,[data-dice-mod],.bonus-card-chip[data-bonus-card],.mosque-card-chip[data-mosque-ability]');
+  const t=target.closest?.('.tile[data-location],#do-action,#end-turn,#roll-tea,#roll-black,#return-fountain,.choice-modal-btn,.good-pick,[data-dice-mod],.bonus-card-chip[data-bonus-card],.mosque-card-chip[data-mosque-ability],[data-caravan-keep],[data-family-reward]');
   if(!t) return null;
   if(t.dataset && t.dataset.location) return {kind:'tile', loc:t.dataset.location};
+  // Check these two before the generic .choice-modal-btn fallback below — the
+  // big choice modal (renderStateChoiceModal) reuses that class for styling
+  // but identifies its buttons by these dataset attrs, not data-i.
+  if(t.dataset && t.dataset.caravanKeep) return {kind:'caravan', v:t.dataset.caravanKeep};
+  if(t.dataset && t.dataset.familyReward) return {kind:'family', v:t.dataset.familyReward};
   if(t.classList.contains('choice-modal-btn')) return {kind:'modal', i:t.dataset.i};
   if(t.classList.contains('good-pick')) return {kind:'good', g:t.dataset.good||t.dataset.blackGood||''};
   if(t.dataset && t.dataset.diceMod) return {kind:'dmod', v:t.dataset.diceMod};
@@ -2629,6 +2662,8 @@ function mpReplayClick(from, d){
   else if(d.kind==='dmod') el=q(`[data-dice-mod="${d.v}"]`);
   else if(d.kind==='card') el=q(`.bonus-card-chip[data-bonus-card="${d.id}"]`);
   else if(d.kind==='mosque') el=q(`.mosque-card-chip[data-mosque-ability="${d.ability}"]`);
+  else if(d.kind==='caravan') el=q(`[data-caravan-keep="${d.v}"]`);
+  else if(d.kind==='family') el=q(`[data-family-reward="${d.v}"]`);
   else if(d.kind==='val'){ const i=document.getElementById(d.id); if(i) i.value=d.value; return; }
   else if(d.kind==='fpick'){ const c=[...document.querySelectorAll('.fountain-pick')].find(x=>x.value===d.value); if(c) c.checked=d.checked; return; }
   if(el) el.click();
