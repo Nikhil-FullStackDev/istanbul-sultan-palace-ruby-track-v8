@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Istanbul — Board Layout</title><link rel="stylesheet" href="board.css?v=20260911n"><style>.tile{position:relative}.tile-slot{top:0!important;left:0!important;width:100%!important;height:100%!important}.deck{will-change:transform}</style></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Istanbul — Board Layout</title><link rel="stylesheet" href="board.css?v=20260911o"><style>.tile{position:relative}.tile-slot{top:0!important;left:0!important;width:100%!important;height:100%!important}.deck{will-change:transform}</style></head>
 <body class="fit"><main>
   <header>
     <p class="eyebrow">Board assembly · base game · build 20260909u</p>
@@ -24,8 +24,9 @@
       <p class="setup-hint">Pick a player count for a fresh random board. Share the <strong>board code</strong> — anyone who pastes it and clicks <strong>Join</strong> gets the identical layout and player count. (Play is local — take turns on this device.)</p>
       <div class="turn-row">
         <div id="turn-status" class="turn-status">Setting up…</div>
-        <div class="turn-actions"><button id="do-action" type="button" class="do-action">Move to a tile first</button><button id="end-turn" type="button">End turn</button></div>
+        <div class="turn-actions"><button id="do-action" type="button" class="do-action">Move to a tile first</button><button id="use-cards-btn" type="button" hidden>Use Bonus/Mosque card</button><button id="end-turn" type="button">End turn</button></div>
       </div>
+      <div id="cards-panel" class="cards-panel" hidden></div>
       <p id="turn-hint" class="turn-hint"></p>
       <div id="dice-tray" class="dice-tray"></div>
       <ol id="game-log" class="game-log" aria-label="Recent actions"></ol>
@@ -37,5 +38,5 @@
   </section>
 </main>
 <div id="turn-toast" class="turn-toast" role="status" aria-live="polite" hidden></div>
-<script src="net.js?v=20260911n"></script><script src="board.seed.js?v=20260910c"></script><script src="board.js?v=20260911n"></script>
+<script src="net.js?v=20260911n"></script><script src="board.seed.js?v=20260910c"></script><script src="board.js?v=20260911o"></script>
 </body></html>

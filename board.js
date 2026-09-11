@@ -1547,10 +1547,8 @@ function renderActionUI(){
     diceTray.innerHTML=`<span class="dice-caption">Wheelbarrow: ${p.cartUnlocked.filter(Boolean).length}/3 extensions unlocked. Cost: 7 Lira.</span>`;diceTray.classList.add('has-roll');
   }else if(info.type==='warehouse'){
     const g=info.good;
-    // Once-per-turn ability: hide the button as soon as it's been used (or can't be afforded),
-    // same as the Yellow Mosque tile's recall panel — otherwise a spent button just sits there.
-    const showGreenBtn=hasAbility(p,'green')&&!p.greenBonusUsed&&p.coins>=2;
-    diceTray.innerHTML=`<span class="dice-caption">${GOOD_LABEL[g]}: ${p.goods[g]||0}/${cartCapacity(p)}</span>${showGreenBtn?'<button type="button" id="green-bonus">Use Green Mosque: +1 good for 2 Lira</button>':''}`;diceTray.classList.add('has-roll');
+    // The Green Mosque tile's "+1 good" is offered from the Use Bonus/Mosque card panel now.
+    diceTray.innerHTML=`<span class="dice-caption">${GOOD_LABEL[g]}: ${p.goods[g]||0}/${cartCapacity(p)}</span>`;diceTray.classList.add('has-roll');
   }else if(info.type==='police'){
     if(familyPlacementMode){diceTray.innerHTML=`<span class="dice-caption">Click a highlighted tile to send your Family Member there — you then carry out that Place's action (no encounters).</span>`;diceTray.classList.add('has-roll')}
     else diceTray.innerHTML=`<span class="dice-caption">Press <strong>Do action at Police Station</strong> to free your Family Member.</span>`;
@@ -1737,7 +1735,7 @@ function nextTurn(){
   // A turn ended mid-Caravansary: return any revealed-but-unkept cards to the deck.
   if(caravanOffer.length){bonusDeck.unshift(...caravanOffer);}
   caravanChoice=null;caravanPendingCards=[];caravanOffer=[];marketQuantities={fabric:0,spice:0,fruit:0,heirloom:0};teaTarget=null;blackGoodChoice='fabric';pendingGoodChoice=null;pendingPalaceAny=false;
-  turn=(turn+1)%players.length;awaitingAction=false;actionInitiated=false;pendingAssistantDrop=false;pendingDice=null;familyActionTarget=null;familyActionMode=false;pendingFamilyCatch=null;lastDiceRoll=null;
+  turn=(turn+1)%players.length;awaitingAction=false;actionInitiated=false;pendingAssistantDrop=false;pendingDice=null;familyActionTarget=null;familyActionMode=false;pendingFamilyCatch=null;lastDiceRoll=null;cardsPanelOpen=false;
   players.forEach(p=>{p.yellowRecallUsed=false;p.greenBonusUsed=false});
   renderAll();
   announceTurn();
@@ -2227,6 +2225,83 @@ function announceTurn(force){
     setTimeout(()=>{ if(!el.classList.contains('show')) el.hidden=true; },450);
   },2400);
 }
+// ---- Use Bonus/Mosque card panel ----------------------------------------
+// One discoverable button + list, instead of scattered buttons that only ever
+// appeared when something happened to already be playable.
+let cardsPanelOpen=false;
+const MOSQUE_ABILITY_INFO={
+  red:   {title:'Red — Fabric tile',  desc:'Modify your roll at the Tea House or Black Market — offered right after you roll.'},
+  green: {title:'Green — Spice tile', desc:'Pay 2 Lira for 1 extra good while carrying out a Warehouse action.'},
+  yellow:{title:'Yellow — Fruit tile',desc:'Pay 2 Lira to recall one Assistant back to your Merchant.'},
+};
+function renderCardsPanel(p){
+  const btn=document.getElementById('use-cards-btn'),panel=document.getElementById('cards-panel');
+  if(!btn||!panel)return;
+  const blocked=!p||p.id!==turn||gameOver===true||!!caravanChoice||!!pendingGoodChoice||!!pendingDice||pendingFamilyRewards.length>0;
+  const hand=Array.isArray(p&&p.bonusHand)?p.bonusHand:[];
+  const mosqueColors=['red','green','yellow'].filter(c=>hasAbility(p,c));
+  const hasAnything=hand.length>0||mosqueColors.length>0;
+  if(blocked||!hasAnything){
+    btn.hidden=true;panel.hidden=true;
+    if(blocked)cardsPanelOpen=false; // don't silently reopen with stale content once unblocked
+    return;
+  }
+  btn.hidden=false;
+  const playable=playableBonusCards();
+  const greenReady=mosqueColors.includes('green')&&!p.greenBonusUsed&&p.coins>=2&&awaitingAction&&actionInfo[p.pos]?.type==='warehouse';
+  const yellowReady=mosqueColors.includes('yellow')&&!p.yellowRecallUsed&&p.coins>=2&&p.left.length>0;
+  const readyCount=playable.length+(greenReady?1:0)+(yellowReady?1:0);
+  btn.textContent=`Use Bonus/Mosque card${readyCount?` (${readyCount})`:''}`;
+  btn.classList.toggle('has-ready',readyCount>0);
+  panel.hidden=!cardsPanelOpen;
+  if(!cardsPanelOpen)return;
+
+  const byType={};
+  hand.forEach(id=>{const t=bonusType(id);(byType[t]=byType[t]||[]).push(id);});
+  const bonusRows=Object.keys(byType).map(t=>{
+    const d=BONUS_DEFS[t];if(!d)return '';
+    const ids=byType[t],readyId=ids.find(id=>playable.includes(id)),usable=!!readyId;
+    let reason='';
+    if(!usable){
+      if(d.phase==='move')reason='Only before you move this turn';
+      else if(d.phase==='place')reason=`Only while carrying out the ${d.place} action`;
+      else reason='Not available right now';
+    }
+    return `<div class="card-row ${usable?'':'is-disabled'}"><img src="${bonusImage(ids[0])}" alt="">`
+      +`<div class="card-row-text"><strong>${d.name}</strong>${ids.length>1?`<span class="card-count">×${ids.length}</span>`:''}${reason?`<span class="card-reason">${reason}</span>`:''}</div>`
+      +`<button type="button" data-play-bonus="${readyId||''}" ${usable?'':'disabled'}>Play</button></div>`;
+  }).join('');
+
+  const mosqueRows=mosqueColors.map(color=>{
+    const info=MOSQUE_ABILITY_INFO[color];
+    if(color==='red')return `<div class="card-row is-info"><div class="card-row-text"><strong>${info.title}</strong><span class="card-reason">${info.desc}</span></div></div>`;
+    if(color==='green'){
+      let reason=info.desc;
+      if(p.greenBonusUsed)reason='Already used this turn';
+      else if(p.coins<2)reason='Need 2 Lira';
+      else if(!(awaitingAction&&actionInfo[p.pos]?.type==='warehouse'))reason='Only while carrying out a Warehouse action';
+      return `<div class="card-row ${greenReady?'':'is-disabled'}"><div class="card-row-text"><strong>${info.title}</strong><span class="card-reason">${reason}</span></div><button type="button" id="green-bonus" ${greenReady?'':'disabled'}>Use</button></div>`;
+    }
+    if(color==='yellow'){
+      if(yellowReady){
+        return `<div class="card-row"><div class="card-row-text"><strong>${info.title}</strong><span class="card-reason">Pick which Assistant to bring back:</span></div>`
+          +`<div class="card-row-choices">${p.left.map((place,i)=>`<button type="button" data-yellow-recall-panel="${i}">${place}</button>`).join('')}</div></div>`;
+      }
+      let reason=info.desc;
+      if(p.yellowRecallUsed)reason='Already used this turn';
+      else if(p.coins<2)reason='Need 2 Lira';
+      else if(!p.left.length)reason='No Assistants away right now';
+      return `<div class="card-row is-disabled"><div class="card-row-text"><strong>${info.title}</strong><span class="card-reason">${reason}</span></div></div>`;
+    }
+    return '';
+  }).join('');
+
+  panel.innerHTML=(bonusRows?`<div class="cards-panel-section"><h4>Bonus cards</h4>${bonusRows}</div>`:'')
+    +(mosqueRows?`<div class="cards-panel-section"><h4>Mosque tile abilities</h4>${mosqueRows}</div>`:'');
+  panel.querySelectorAll('[data-play-bonus]').forEach(b=>b.onclick=()=>{ if(b.dataset.playBonus)playBonusCard(b.dataset.playBonus); });
+  panel.querySelectorAll('[data-yellow-recall-panel]').forEach(b=>b.onclick=()=>useYellowRecall(p,b.dataset.yellowRecallPanel));
+  // #green-bonus is handled by the existing document-level click delegate.
+}
 function renderAll(){renderTurnStatus();renderActionUI();updateReachable();placePlayers();renderPlayerBoards();renderCardSupply();
   const p=activePlayer();
   document.querySelector('#family-target')?.remove();
@@ -2258,27 +2333,8 @@ function renderAll(){renderTurnStatus();renderActionUI();updateReachable();place
       el.querySelectorAll('.good-pick[data-good]').forEach(b=>b.onclick=()=>resolveGoodChoice(b.dataset.good));
     }
   }
-  document.querySelector('#yellow-mosque-ui')?.remove();
-  // Yellow Mosque tile: once on your turn (any phase) pay 2 Lira to recall an Assistant.
-  if(p&&p.id===turn&&!gameOver&&hasAbility(p,'yellow')&&!p.yellowRecallUsed&&p.left.length&&p.coins>=2&&!pendingDice&&!pendingFamilyRewards.length){
-    const panel=document.querySelector('.turn-actions');
-    if(panel){const el=document.createElement('div');el.id='yellow-mosque-ui';el.innerHTML=`<span>Fruit Mosque tile — recall an Assistant for 2 Lira:</span>${p.left.map((place,i)=>`<button type="button" data-yellow-recall="${i}">${place}</button>`).join('')}`;panel.append(el);el.querySelectorAll('[data-yellow-recall]').forEach(b=>b.onclick=()=>useYellowRecall(p,b.dataset.yellowRecall));}
-  }
   if(pendingFamilyRewards.length && !awaitingAction)showFamilyRewardUI();
-  document.querySelector('#bonus-play-ui')?.remove();
-  const playCards=playableBonusCards();
-  if(playCards.length){
-    const panel=document.querySelector('.turn-actions');
-    if(panel){
-      const el=document.createElement('div');el.id='bonus-play-ui';
-      el.innerHTML=`<span>Bonus cards:</span>`+[...new Set(playCards.map(bonusType))].map(t=>{
-        const id=playCards.find(c=>bonusType(c)===t);
-        return `<button type="button" data-play-bonus="${id}">${BONUS_DEFS[t].name}</button>`;
-      }).join('');
-      panel.append(el);
-      el.querySelectorAll('[data-play-bonus]').forEach(b=>b.onclick=()=>playBonusCard(b.dataset.playBonus));
-    }
-  }
+  renderCardsPanel(p);
   markPlayerCountButtons();
   logEl.innerHTML=gameLog.slice(0,10).map(x=>`<li>${x}</li>`).join('');requestAnimationFrame(()=>{placeAttachments();renderGemClaims();renderSultanPalaceCubes()});
 }
@@ -2286,6 +2342,8 @@ function renderAll(){renderTurnStatus();renderActionUI();updateReachable();place
 // Event wiring
 if(actionBtn){actionBtn.onclick=performAction}
 if(endTurnBtn){endTurnBtn.onclick=()=>{if(awaitingAction){awaitingAction=false;if(pendingFamilyRewards.length){renderAll();return}}nextTurn()}}
+const useCardsBtn=document.getElementById('use-cards-btn');
+if(useCardsBtn){useCardsBtn.onclick=()=>{cardsPanelOpen=!cardsPanelOpen;renderCardsPanel(activePlayer())}}
 if(playerCountSelect){playerCountSelect.onchange=()=>newGame(safeInt(playerCountSelect.value,1))}
 document.querySelector('#new-game')?.addEventListener('click',()=>newGame(safeInt(playerCountSelect?.value,1)));
 // Player-count buttons: start a fresh game (new random 16-tile layout) with N players.
