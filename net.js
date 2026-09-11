@@ -156,7 +156,18 @@
         if (c.length === 4) { localStorage.setItem('mp-name', n); NET._pendingName = n || null; joinRoom(c); }
       };
       $('#mp-code', el).addEventListener('keydown', e => { if (e.key === 'Enter') $('#mp-join', el).click(); });
-      $('#mp-solo', el).onclick = () => { NET.role = 'solo'; history.replaceState(null, '', location.pathname); hideLobby(); document.body.classList.add('mp-solo'); };
+      $('#mp-solo', el).onclick = () => {
+        const n = ($('#mp-name', el).value || '').trim().slice(0, 24);
+        if (n) localStorage.setItem('mp-name', n);
+        NET.role = 'solo'; history.replaceState(null, '', location.pathname); hideLobby(); document.body.classList.add('mp-solo');
+        // The board's very first newGame() ran at script load, before this name
+        // existed — apply it to player 1 now and refresh what's on screen.
+        if (window.applySoloNameFromStorage) {
+          window.applySoloNameFromStorage();
+          window.renderAll && window.renderAll();
+          window.announceTurn && window.announceTurn(true);
+        }
+      };
       return;
     }
 

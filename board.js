@@ -1735,7 +1735,7 @@ function nextTurn(){
   // A turn ended mid-Caravansary: return any revealed-but-unkept cards to the deck.
   if(caravanOffer.length){bonusDeck.unshift(...caravanOffer);}
   caravanChoice=null;caravanPendingCards=[];caravanOffer=[];marketQuantities={fabric:0,spice:0,fruit:0,heirloom:0};teaTarget=null;blackGoodChoice='fabric';pendingGoodChoice=null;pendingPalaceAny=false;
-  turn=(turn+1)%players.length;awaitingAction=false;actionInitiated=false;pendingAssistantDrop=false;pendingDice=null;familyActionTarget=null;familyActionMode=false;pendingFamilyCatch=null;lastDiceRoll=null;cardsPanelOpen=false;
+  turn=(turn+1)%players.length;awaitingAction=false;actionInitiated=false;pendingAssistantDrop=false;pendingDice=null;familyActionTarget=null;familyActionMode=false;pendingFamilyCatch=null;lastDiceRoll=null;
   players.forEach(p=>{p.yellowRecallUsed=false;p.greenBonusUsed=false});
   renderAll();
   announceTurn();
@@ -2135,7 +2135,14 @@ function playerBoardCardHTML(p){
       const canPlay=playable.includes(id);
       return `<button type="button" class="bonus-card-chip ${canPlay?'is-playable':''}" data-player="${p.id}" data-bonus-card="${id}" data-discard-card="${id}" draggable="true" title="${canPlay?'Play: ':''}${bonusName(id)}"><img src="${bonusImage(id)}" alt="${bonusName(id)}"> <span>${canPlay?'▶':i+1}</span></button>`;
     }).join('');
-    const mosqueHand=(p.mosqueCardHand||[]).map((id,i)=>{const c=parseMosqueCardId(id);return `<div class="mosque-card-chip" title="${c.mosque} Mosque tile — ${GOOD_LABEL[c.color]} (${MOSQUE_ABILITY[c.color]} ability)"><img src="${mosqueCardImage(c.mosque,c.color,c.req)}" alt="${c.mosque} ${GOOD_LABEL[c.color]} Mosque tile"><span>M</span></div>`}).join('');
+    const mosqueHand=(p.mosqueCardHand||[]).map((id,i)=>{
+      const c=parseMosqueCardId(id);
+      const ability=MOSQUE_ABILITY[c.color];
+      const info=MOSQUE_ABILITY_INFO[ability];
+      const ready=mosqueAbilityReady(p,ability);
+      const clickable=ability==='green'||ability==='yellow';
+      return `<div class="mosque-card-chip ${ready?'is-playable':''} ${clickable?'':'is-info'}" ${clickable?`data-player="${p.id}" data-mosque-ability="${ability}"`:''} title="${info?`${info.title} — ${info.desc}`:`${c.mosque} Mosque tile`}"><img src="${mosqueCardImage(c.mosque,c.color,c.req)}" alt="${c.mosque} ${GOOD_LABEL[c.color]} Mosque tile">${ready?'<span>▶</span>':''}</div>`;
+    }).join('');
     // One "Hand" holding every kind of card the player owns (Bonus cards + Mosque tiles).
     const handHtml=(cardHand+mosqueHand)||'<span class="empty-card-slot">No cards</span>';
     return `<div class="player-board-card ${p.id===turn&&!gameOver?'is-current':''}"><h3><span class="dot" style="background:${cssColor(p.color)}"></span>${p.name}</h3><div class="player-board-stage"><span class="sultan-row-arrow-spacer" aria-hidden="true"></span><div class="cart-board-wrap"><img class="wheelbarrow-art" src="assets/player-pieces/cart-board.png" alt="${p.name} wheelbarrow" draggable="false"><div class="player-board-layers-layer">${layersHtml}</div><div class="player-board-slot-locks">${slotLocksHtml}</div><div class="sultan-cubes-layer">${cubes}</div><div class="cart-vertical-locks">${locks}</div></div>${renderCoinRack(p)}<div class="player-card-sidebar"><div class="bonus-hand-area"><span class="card-area-label">Hand</span><div class="bonus-card-row">${handHtml}</div></div><div class="discard-area"><span class="card-area-label">Discard</span><div class="discard-slot ${bonusDiscard.length?'has-cards':''}" data-player="${p.id}">${bonusDiscard.length?`<img src="${bonusImage(bonusDiscard[bonusDiscard.length-1])}" alt="Top discard: ${bonusName(bonusDiscard[bonusDiscard.length-1])}"><span>x${bonusDiscard.length}</span>`:'<span>Drop card here</span>'}</div></div></div><span class="sultan-row-arrow-spacer" aria-hidden="true"></span></div></div>`;
@@ -2160,6 +2167,22 @@ function bindPlayerBoardsInteractions(){
     b.addEventListener('dragstart',e=>{e.dataTransfer?.setData('text/plain',JSON.stringify({playerId:Number(b.dataset.player),cardId:b.dataset.discardCard}));b.classList.add('dragging')});
     b.addEventListener('dragend',()=>b.classList.remove('dragging'));
   });
+  boardsEl.querySelectorAll('[data-mosque-ability]').forEach(chip=>{
+    chip.onclick=async()=>{
+      const p=players.find(x=>x.id===Number(chip.dataset.player));if(!p||p.id!==turn)return;
+      const ability=chip.dataset.mosqueAbility;
+      if(!mosqueAbilityReady(p,ability))return;
+      if(ability==='green'){performGreenBonus(p);return}
+      if(ability==='yellow'){
+        const idx=await modalChoice({title:'Recall which Assistant?',options:[
+          ...p.left.map((place,i)=>({label:place,value:i})),
+          {label:'Cancel',value:-1},
+        ]});
+        if(idx==null||idx<0)return;
+        useYellowRecall(p,idx);
+      }
+    };
+  });
   boardsEl.querySelectorAll('.discard-slot').forEach(slot=>{
     slot.addEventListener('dragover',e=>e.preventDefault());
     slot.addEventListener('drop',e=>{
@@ -2181,6 +2204,12 @@ function renderCardSupply(){
   if(slot)slot.innerHTML=bonusDiscard.length?`<img src="${bonusImage(bonusDiscard[bonusDiscard.length-1])}" alt="Top discard: ${bonusName(bonusDiscard[bonusDiscard.length-1])}"><span>Discard pile · ${bonusDiscard.length}</span>`:'<span>Discard pile · 0</span>';
 }
 
+function isMyTurn(p){
+  if(!p)return false;
+  if(window.NET&&NET.role!=='solo')return p.color===NET.myColor;
+  // Solo / local hotseat: whoever typed their name into the lobby is player 1 — "you".
+  return p.id===0;
+}
 function renderTurnBadge(text,opts={}){
   const badge=document.getElementById('turn-badge');
   if(!badge)return;
@@ -2199,7 +2228,7 @@ function renderTurnStatus(){
     return;
   }
   if(!p){turnStatus.textContent='Setting up…';renderTurnBadge('');return}
-  const isMine=window.NET&&NET.role!=='solo'&&p.color===NET.myColor;
+  const isMine=isMyTurn(p);
   const who=isMine?'Your turn':`${p.name}'s turn`;
   turnStatus.textContent=`${who} — ${p.pos}${gameOver==='round'?' (final round)':''}`;
   renderTurnBadge(`${who}${gameOver==='round'?' · final round':''}`,{color:cssColor(p.color),mine:isMine});
@@ -2227,7 +2256,7 @@ function announceTurn(force){
   if(!el||!p||gameOver===true)return;
   if(!force && announceTurn._last===p.id)return;
   announceTurn._last=p.id;
-  const isMine=window.NET&&NET.role!=='solo'&&p.color===NET.myColor;
+  const isMine=isMyTurn(p);
   el.textContent=isMine?'Your turn to move' : `${p.name}'s turn to move`;
   el.hidden=false;
   requestAnimationFrame(()=>el.classList.add('show'));
@@ -2237,87 +2266,20 @@ function announceTurn(force){
     setTimeout(()=>{ if(!el.classList.contains('show')) el.hidden=true; },450);
   },2400);
 }
-// ---- Use Bonus/Mosque card panel ----------------------------------------
-// One discoverable button + list, instead of scattered buttons that only ever
-// appeared when something happened to already be playable.
-let cardsPanelOpen=false;
+// Mosque-ability hover text + readiness, shared by the Hand row on the
+// wheelbarrow (mosque tile chips there are clickable — see playerBoardCardHTML
+// and bindPlayerBoardsInteractions).
 const MOSQUE_ABILITY_INFO={
   red:   {title:'Red — Fabric tile',  desc:'Modify your roll at the Tea House or Black Market — offered right after you roll.'},
   green: {title:'Green — Spice tile', desc:'Pay 2 Lira for 1 extra good while carrying out a Warehouse action.'},
   yellow:{title:'Yellow — Fruit tile',desc:'Pay 2 Lira to recall one Assistant back to your Merchant.'},
+  blue:  {title:'Blue — Ring tile',   desc:'Gave you a 5th Assistant automatically when you bought this tile.'},
 };
-function renderCardsPanel(p){
-  const btn=document.getElementById('use-cards-btn'),panel=document.getElementById('cards-panel');
-  if(!btn||!panel)return;
-  const blocked=!p||p.id!==turn||gameOver===true||!!caravanChoice||!!pendingGoodChoice||!!pendingDice||pendingFamilyRewards.length>0;
-  const hand=Array.isArray(p&&p.bonusHand)?p.bonusHand:[];
-  const mosqueColors=['red','green','yellow'].filter(c=>hasAbility(p,c));
-  const hasAnything=hand.length>0||mosqueColors.length>0;
-  if(blocked||!hasAnything){
-    btn.hidden=true;panel.hidden=true;
-    if(blocked)cardsPanelOpen=false; // don't silently reopen with stale content once unblocked
-    return;
-  }
-  btn.hidden=false;
-  const playable=playableBonusCards();
-  const greenReady=mosqueColors.includes('green')&&!p.greenBonusUsed&&p.coins>=2&&awaitingAction&&actionInfo[p.pos]?.type==='warehouse';
-  const yellowReady=mosqueColors.includes('yellow')&&!p.yellowRecallUsed&&p.coins>=2&&p.left.length>0;
-  const readyCount=playable.length+(greenReady?1:0)+(yellowReady?1:0);
-  btn.textContent='Use card';
-  btn.classList.toggle('has-ready',readyCount>0);
-  panel.hidden=!cardsPanelOpen;
-  if(!cardsPanelOpen)return;
-
-  const byType={};
-  hand.forEach(id=>{const t=bonusType(id);(byType[t]=byType[t]||[]).push(id);});
-  const bonusRows=Object.keys(byType).map(t=>{
-    const d=BONUS_DEFS[t];if(!d)return '';
-    const ids=byType[t],readyId=ids.find(id=>playable.includes(id)),usable=!!readyId;
-    let reason='';
-    if(!usable){
-      if(d.phase==='move')reason='Only before you move this turn';
-      else if(d.phase==='place')reason=`Only while carrying out the ${d.place} action`;
-      else reason='Not available right now';
-    }
-    return `<div class="card-row ${usable?'':'is-disabled'}"><img src="${bonusImage(ids[0])}" alt="">`
-      +`<div class="card-row-text"><strong>${d.name}</strong>${ids.length>1?`<span class="card-count">×${ids.length}</span>`:''}${reason?`<span class="card-reason">${reason}</span>`:''}</div>`
-      +`<button type="button" data-play-bonus="${readyId||''}" ${usable?'':'disabled'}>Play</button></div>`;
-  }).join('');
-
-  // Mosque abilities: just the tile's own card art, hover for what it does —
-  // no permanent block of descriptive text taking up panel space.
-  const mosqueRows=mosqueColors.map(color=>{
-    const info=MOSQUE_ABILITY_INFO[color];
-    const cardId=(p.mosqueCardHand||[]).find(id=>MOSQUE_ABILITY[parseMosqueCardId(id).color]===color);
-    const c=cardId?parseMosqueCardId(cardId):null;
-    const img=c?mosqueCardImage(c.mosque,c.color,c.req):'';
-    if(color==='red')return `<div class="card-row mosque-icon-row is-info"><img src="${img}" alt="${info.title}" title="${info.title} — ${info.desc}"></div>`;
-    if(color==='green'){
-      let reason=info.desc;
-      if(p.greenBonusUsed)reason='Already used this turn';
-      else if(p.coins<2)reason='Need 2 Lira';
-      else if(!(awaitingAction&&actionInfo[p.pos]?.type==='warehouse'))reason='Only while carrying out a Warehouse action';
-      return `<div class="card-row mosque-icon-row ${greenReady?'':'is-disabled'}"><img src="${img}" alt="${info.title}" title="${info.title} — ${reason}"><button type="button" id="green-bonus" ${greenReady?'':'disabled'}>Use</button></div>`;
-    }
-    if(color==='yellow'){
-      if(yellowReady){
-        return `<div class="card-row mosque-icon-row"><img src="${img}" alt="${info.title}" title="${info.title} — pick an Assistant to recall">`
-          +`<div class="card-row-choices">${p.left.map((place,i)=>`<button type="button" data-yellow-recall-panel="${i}">${place}</button>`).join('')}</div></div>`;
-      }
-      let reason=info.desc;
-      if(p.yellowRecallUsed)reason='Already used this turn';
-      else if(p.coins<2)reason='Need 2 Lira';
-      else if(!p.left.length)reason='No Assistants away right now';
-      return `<div class="card-row mosque-icon-row is-disabled"><img src="${img}" alt="${info.title}" title="${info.title} — ${reason}"></div>`;
-    }
-    return '';
-  }).join('');
-
-  panel.innerHTML=(bonusRows?`<div class="cards-panel-section"><h4>Bonus cards</h4>${bonusRows}</div>`:'')
-    +(mosqueRows?`<div class="cards-panel-section"><h4>Mosque tile abilities</h4>${mosqueRows}</div>`:'');
-  panel.querySelectorAll('[data-play-bonus]').forEach(b=>b.onclick=()=>{ if(b.dataset.playBonus)playBonusCard(b.dataset.playBonus); });
-  panel.querySelectorAll('[data-yellow-recall-panel]').forEach(b=>b.onclick=()=>useYellowRecall(p,b.dataset.yellowRecallPanel));
-  // #green-bonus is handled by the existing document-level click delegate.
+function mosqueAbilityReady(p,ability){
+  if(!p||p.id!==turn)return false;
+  if(ability==='green')return !p.greenBonusUsed&&p.coins>=2&&awaitingAction&&actionInfo[p.pos]?.type==='warehouse';
+  if(ability==='yellow')return !p.yellowRecallUsed&&p.coins>=2&&p.left.length>0;
+  return false;
 }
 function renderAll(){renderTurnStatus();renderActionUI();updateReachable();placePlayers();renderPlayerBoards();renderCardSupply();
   const p=activePlayer();
@@ -2351,7 +2313,6 @@ function renderAll(){renderTurnStatus();renderActionUI();updateReachable();place
     }
   }
   if(pendingFamilyRewards.length && !awaitingAction)showFamilyRewardUI();
-  renderCardsPanel(p);
   markPlayerCountButtons();
   if(logEl)logEl.innerHTML=gameLog.slice(0,10).map(x=>`<li>${x}</li>`).join('');requestAnimationFrame(()=>{placeAttachments();renderGemClaims();renderSultanPalaceCubes()});
 }
@@ -2359,8 +2320,6 @@ function renderAll(){renderTurnStatus();renderActionUI();updateReachable();place
 // Event wiring
 if(actionBtn){actionBtn.onclick=performAction}
 if(endTurnBtn){endTurnBtn.onclick=()=>{if(awaitingAction){awaitingAction=false;if(pendingFamilyRewards.length){renderAll();return}}nextTurn()}}
-const useCardsBtn=document.getElementById('use-cards-btn');
-if(useCardsBtn){useCardsBtn.onclick=()=>{cardsPanelOpen=!cardsPanelOpen;renderAll()}}
 if(playerCountSelect){playerCountSelect.onchange=()=>newGame(safeInt(playerCountSelect.value,1))}
 document.querySelector('#new-game')?.addEventListener('click',()=>newGame(safeInt(playerCountSelect?.value,1)));
 // Player-count buttons: start a fresh game (new random 16-tile layout) with N players.
@@ -2448,6 +2407,18 @@ document.addEventListener('input',e=>{
 
 // opts.layout: 'random' → fresh random layout + new seed; a number → that seed;
 // undefined → keep whatever board is currently up (page reload / re-init).
+// Solo/local play never goes through the MP roster, so this pulls the name
+// typed into the lobby's "Your name" field (if any) onto player 1 — otherwise
+// they'd be stuck as the generic "Red Merchant" forever. A plain top-level
+// `function` is a `window` property, so net.js can call this directly once
+// the player confirms "Play solo instead" (the very first newGame() call
+// happens at script load, before the lobby has even been answered).
+function applySoloNameFromStorage(){
+  if((!window.NET||NET.role==='solo')&&players[0]){
+    const n=(localStorage.getItem('mp-name')||'').trim().slice(0,24);
+    if(n)players[0].name=n;
+  }
+}
 function newGame(count,opts={}){
   count=Math.min(PLAYER_COLORS.length,Math.max(1,safeInt(count,1))); // only 4 player colours exist
   const wantLayout=opts.layout;
@@ -2467,6 +2438,10 @@ function newGame(count,opts={}){
   gemstoneLayers.forEach(l=>{ if(l&&l.trackIndex){ delete l.claimed; delete l.opacity; } });
   persistGemstoneLayers();
   sultanCubes={};selectedSultanCube=null;localStorage.setItem(SULTAN_CUBE_KEY,JSON.stringify(sultanCubes));players=loadSavedPlayers(count);players.forEach(p=>{p.rubies=0});ensurePlayerCustomC25Row();ensureRubyLayers();mirrorPlayerBoardLayout();turn=0;gameOver=false;awaitingAction=false;actionInitiated=false;pendingAssistantDrop=false;pendingBonusDiceEffect=null;winnerTarget=count===2?6:5;lastDiceRoll=null;teaTarget=null;pendingDice=null;pendingFamilyRewards=[];familyActionTarget=null;familyActionMode=false;smallDemandDeck=createDemandDeck('small');largeDemandDeck=createDemandDeck('large');smallDemandIndex=0;largeDemandIndex=0;postCubeSlots=[0,2,4,6];postCubeDirection='down';persistPostOfficeState();palaceRubyIndex=0;persistPalaceRubyIndex();gemstoneRubyIndex=0;bonusDeck=makeBonusDeck();bonusDiscard=[];bonusMoveMax=2;bonusDoubleAction=null;bonusMarketFlex=false;bonusReusePlace=false;localStorage.removeItem(MOSQUE_STACK_KEY);initMosqueStacks();players.forEach(p=>{p.bonusHand=[];p.bonusCards=0;p.mosqueCardHand=[];p.yellowRecallUsed=false;p.greenBonusUsed=false;p.redMosqueUsed=false;p.wainwrightRubyTaken=false;p.rubies=0});persistPlayerRubySlots();persistPlayerState();sultanCubes={};selectedSultanCube=null;localStorage.setItem(SULTAN_CUBE_KEY,JSON.stringify(sultanCubes));gameLog.length=0;
+  // Solo/local play never goes through the MP roster, so pull the name the
+  // player typed into the lobby's "Your name" field (if any) onto player 1 —
+  // otherwise they'd be stuck as the generic "Red Merchant" forever.
+  applySoloNameFromStorage();
   const doRandom = opts.layout!==undefined;
   if(doRandom) addLog(`New ${count}-player game — board code ${makeGameCode(gameSeed,count)}.`);
   addLog(`${players[0].name} starts at the Fountain.`);
@@ -2631,13 +2606,14 @@ function mpSetTurnGate(){
 
 // ---- click describe / replay -------------------------------------
 function mpDescribeClick(target){
-  const t=target.closest?.('.tile[data-location],#do-action,#end-turn,#roll-tea,#roll-black,#return-fountain,.choice-modal-btn,.good-pick,[data-dice-mod],.bonus-card-chip[data-bonus-card]');
+  const t=target.closest?.('.tile[data-location],#do-action,#end-turn,#roll-tea,#roll-black,#return-fountain,.choice-modal-btn,.good-pick,[data-dice-mod],.bonus-card-chip[data-bonus-card],.mosque-card-chip[data-mosque-ability]');
   if(!t) return null;
   if(t.dataset && t.dataset.location) return {kind:'tile', loc:t.dataset.location};
   if(t.classList.contains('choice-modal-btn')) return {kind:'modal', i:t.dataset.i};
   if(t.classList.contains('good-pick')) return {kind:'good', g:t.dataset.good||t.dataset.blackGood||''};
   if(t.dataset && t.dataset.diceMod) return {kind:'dmod', v:t.dataset.diceMod};
   if(t.dataset && t.dataset.bonusCard) return {kind:'card', id:t.dataset.bonusCard};
+  if(t.dataset && t.dataset.mosqueAbility) return {kind:'mosque', ability:t.dataset.mosqueAbility};
   if(t.id) return {kind:'id', id:t.id};
   return null;
 }
@@ -2652,6 +2628,7 @@ function mpReplayClick(from, d){
   else if(d.kind==='good') el=q(`.good-pick[data-good="${d.g}"]`)||q(`.good-pick[data-black-good="${d.g}"]`);
   else if(d.kind==='dmod') el=q(`[data-dice-mod="${d.v}"]`);
   else if(d.kind==='card') el=q(`.bonus-card-chip[data-bonus-card="${d.id}"]`);
+  else if(d.kind==='mosque') el=q(`.mosque-card-chip[data-mosque-ability="${d.ability}"]`);
   else if(d.kind==='val'){ const i=document.getElementById(d.id); if(i) i.value=d.value; return; }
   else if(d.kind==='fpick'){ const c=[...document.querySelectorAll('.fountain-pick')].find(x=>x.value===d.value); if(c) c.checked=d.checked; return; }
   if(el) el.click();
