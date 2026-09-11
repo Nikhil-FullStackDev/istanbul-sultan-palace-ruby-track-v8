@@ -1546,7 +1546,11 @@ function renderActionUI(){
   }else if(info.type==='wainwright'){
     diceTray.innerHTML=`<span class="dice-caption">Wheelbarrow: ${p.cartUnlocked.filter(Boolean).length}/3 extensions unlocked. Cost: 7 Lira.</span>`;diceTray.classList.add('has-roll');
   }else if(info.type==='warehouse'){
-    const g=info.good;diceTray.innerHTML=`<span class="dice-caption">${GOOD_LABEL[g]}: ${p.goods[g]||0}/${cartCapacity(p)}</span>${hasAbility(p,'green')?'<button type="button" id="green-bonus">Use Green Mosque: +1 good for 2 Lira</button>':''}`;diceTray.classList.add('has-roll');
+    const g=info.good;
+    // Once-per-turn ability: hide the button as soon as it's been used (or can't be afforded),
+    // same as the Yellow Mosque tile's recall panel — otherwise a spent button just sits there.
+    const showGreenBtn=hasAbility(p,'green')&&!p.greenBonusUsed&&p.coins>=2;
+    diceTray.innerHTML=`<span class="dice-caption">${GOOD_LABEL[g]}: ${p.goods[g]||0}/${cartCapacity(p)}</span>${showGreenBtn?'<button type="button" id="green-bonus">Use Green Mosque: +1 good for 2 Lira</button>':''}`;diceTray.classList.add('has-roll');
   }else if(info.type==='police'){
     if(familyPlacementMode){diceTray.innerHTML=`<span class="dice-caption">Click a highlighted tile to send your Family Member there — you then carry out that Place's action (no encounters).</span>`;diceTray.classList.add('has-roll')}
     else diceTray.innerHTML=`<span class="dice-caption">Press <strong>Do action at Police Station</strong> to free your Family Member.</span>`;
